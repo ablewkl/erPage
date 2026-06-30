@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ETF 策略面板</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08111f;
+      --panel: #101a2d;
+      --panel-2: #0c1526;
+      --line: #23314d;
+      --text: #edf3ff;
+      --muted: #9fb0cf;
+      --accent: #56d4ff;
+      --accent-2: #6ee7b7;
+      --warn: #fde68a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(86, 212, 255, .15), transparent 24%),
+        radial-gradient(circle at top right, rgba(110, 231, 183, .12), transparent 20%),
+        linear-gradient(180deg, #07101d 0%, #08111f 100%);
+    }
+    .shell {
+      width: min(1380px, calc(100vw - 28px));
+      margin: 18px auto 40px;
+    }
+    .topbar, .panel {
+      background: rgba(16, 26, 45, 0.96);
+      border: 1px solid rgba(86, 212, 255, 0.14);
+      border-radius: 8px;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
+    }
+    .topbar {
+      padding: 18px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .topbar h1 {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.15;
+    }
+    .topbar p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+      max-width: 56%;
+    }
+    .toolbar input {
+      width: 360px;
+      max-width: 100%;
+      height: 42px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(86, 212, 255, 0.14);
+      background: rgba(8, 17, 31, 0.78);
+      color: var(--text);
+      outline: none;
+    }
+    .toolbar button {
+      height: 42px;
+      padding: 0 14px;
+      border: 1px solid rgba(86, 212, 255, 0.14);
+      border-radius: 8px;
+      background: rgba(8, 17, 31, 0.78);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .toolbar button.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #06101d;
+      border-color: transparent;
+      font-weight: 700;
+    }
+    .toolbar button.warn {
+      border-color: rgba(253, 230, 138, 0.28);
+      color: var(--warn);
+    }
+    .panel {
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 22px 22px 18px;
+      border-bottom: 1px solid rgba(159, 176, 207, 0.12);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+    }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .panel-header h2 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.15;
+    }
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+      max-width: 62%;
+    }
+    .badge {
+      min-width: 180px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(8, 17, 31, 0.78);
+      border: 1px solid rgba(86, 212, 255, 0.12);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      padding: 18px;
+    }
+    .section {
+      background: rgba(8, 17, 31, 0.8);
+      border: 1px solid rgba(159, 176, 207, 0.14);
+      border-radius: 8px;
+      padding: 14px 14px 10px;
+      min-height: 110px;
+    }
+    .section.wide {
+      grid-column: 1 / -1;
+    }
+    .section h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: var(--text);
+    }
+    .line {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      color: #dce6ff;
+      padding: 2px 0;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+    .empty {
+      color: var(--muted);
+      font-size: 13px;
+      padding-top: 4px;
+    }
+    .status {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .status strong {
+      color: var(--text);
+    }
+    @media (max-width: 980px) {
+      .topbar, .panel-header {
+        flex-direction: column;
+      }
+      .toolbar, .badges {
+        justify-content: flex-start;
+        max-width: none;
+      }
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .section.wide {
+        grid-column: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="topbar">
+      <div>
+        <h1>ETF 策略面板</h1>
+        <p>这个页面部署到 Gitee Pages，前端只负责展示；策略计算与缓存都走你的 SCF JSON 接口。</p>
+        <div class="status" id="status">等待请求</div>
+      </div>
+      <div class="toolbar">
+        <input id="baseUrl" placeholder="填写你的 SCF 域名，例如 https://xxx.ap-guangzhou.tencentscf.com" />
+        <button id="btnV7" class="active">V7</button>
+        <button id="btnV8">V8</button>
+        <button id="btnRefresh" class="warn">强制刷新缓存</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="eyebrow" id="panelEyebrow">未加载</div>
+          <h2 id="panelTitle">策略结果</h2>
+        </div>
+        <div class="badges" id="badges"></div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "etf_scf_base_url";
+    const baseUrlInput = document.getElementById("baseUrl");
+    const statusEl = document.getElementById("status");
+    const panelEyebrow = document.getElementById("panelEyebrow");
+    const panelTitle = document.getElementById("panelTitle");
+    const badgesEl = document.getElementById("badges");
+    const gridEl = document.getElementById("grid");
+    const btnV7 = document.getElementById("btnV7");
+    const btnV8 = document.getElementById("btnV8");
+    const btnRefresh = document.getElementById("btnRefresh");
+
+    let currentStrategy = "v7";
+
+    const SECTION_ORDER = [
+      "页面结果",
+      "卖出计划",
+      "当前待结算持仓",
+      "买入计划",
+      "最新交易日score排行",
+      "新增信号详细",
+      "买入条件",
+      "过滤条件",
+      "卖出条件",
+      "最近命中明细",
+      "最近卖出明细",
+      "年度 / 月度收益"
+    ];
+
+    const HEADING_MAP = {
+      "卖出计划:": "卖出计划",
+      "当前待结算持仓": "当前待结算持仓",
+      "当前待结算持仓:": "当前待结算持仓",
+      "最新V7挂单计划:": "买入计划",
+      "最新V8买入计划:": "买入计划",
+      "最新交易日score排行:": "最新交易日score排行",
+      "新增信号详细:": "新增信号详细",
+      "买入条件:": "买入条件",
+      "过滤条件:": "过滤条件",
+      "卖出条件:": "卖出条件",
+      "最近命中明细:": "最近命中明细",
+      "最近命中/挂单明细:": "最近命中明细",
+      "命中/挂单未成": "最近命中明细",
+      "最近卖出明细:": "最近卖出明细",
+      "卖出:": "最近卖出明细"
+    };
+
+    baseUrlInput.value = localStorage.getItem(STORAGE_KEY) || "";
+
+    function setActiveButton() {
+      btnV7.classList.toggle("active", currentStrategy === "v7");
+      btnV8.classList.toggle("active", currentStrategy === "v8");
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function splitLines(text) {
+      return String(text || "").split(/\r?\n/).map(line => line.trimEnd());
+    }
+
+    function resultSource(payload) {
+      if (payload.error && payload.cached_at) {
+        return "刷新失败，已回退缓存";
+      }
+      if (payload.refreshed) {
+        return "自动刷新";
+      }
+      if (payload.cached) {
+        return "缓存";
+      }
+      return "未知";
+    }
+
+    function extractSummary(lines, payload) {
+      const summary = {
+        title: lines[0] || "",
+        latestTrade: "",
+        stats: "",
+        latestAccount: "",
+        yearlyTitle: "",
+        yearlyLines: []
+      };
+
+      for (let i = 0; i < lines.length; i += 1) {
+        const line = lines[i].trim();
+        if (!summary.latestTrade && line.startsWith("最新交易日:")) {
+          summary.latestTrade = line;
+          continue;
+        }
+        if (!summary.stats && line.startsWith("近") && line.includes("个交易日统计")) {
+          summary.stats = line;
+          continue;
+        }
+        if (!summary.latestAccount && line.startsWith("最新一卖出账户收益")) {
+          summary.latestAccount = line;
+          continue;
+        }
+        if (!summary.yearlyTitle && (line.includes("年度收益") || line.includes("年月度卖出收益") || line.includes("月度卖出收益"))) {
+          summary.yearlyTitle = line;
+          const yearlyLines = [];
+          for (let j = i + 1; j < lines.length; j += 1) {
+            const next = lines[j].trim();
+            if (!next) {
+              break;
+            }
+            if (HEADING_MAP[next]) {
+              break;
+            }
+            yearlyLines.push(next);
+          }
+          summary.yearlyLines = yearlyLines;
+        }
+      }
+
+      const resultLines = [
+        summary.latestTrade || "最新交易日: -",
+        `最后缓存时间: ${payload.cached_at || "-"}`,
+        `结果来源: ${resultSource(payload)}`
+      ];
+      if (summary.stats) resultLines.push(summary.stats);
+      if (summary.latestAccount) resultLines.push(summary.latestAccount);
+      if (payload.error) resultLines.push(`本次刷新失败，已回退缓存: ${payload.error}`);
+      if (summary.yearlyTitle) resultLines.push(summary.yearlyTitle);
+      if (summary.yearlyLines.length) resultLines.push(...summary.yearlyLines);
+
+      return { summary, resultLines };
+    }
+
+    function parseSections(lines, summaryInfo) {
+      const sections = {};
+      SECTION_ORDER.forEach(name => {
+        sections[name] = [];
+      });
+
+      const excluded = new Set();
+      if (summaryInfo.summary.latestAccount) excluded.add(summaryInfo.summary.latestAccount);
+      if (summaryInfo.summary.yearlyTitle) excluded.add(summaryInfo.summary.yearlyTitle);
+      summaryInfo.summary.yearlyLines.forEach(line => excluded.add(line));
+
+      const headingIndexes = [];
+      lines.forEach((line, index) => {
+        const name = HEADING_MAP[line.trim()];
+        if (name) {
+          headingIndexes.push({ index, name });
+        }
+      });
+
+      for (let i = 0; i < headingIndexes.length; i += 1) {
+        const current = headingIndexes[i];
+        const nextIndex = i + 1 < headingIndexes.length ? headingIndexes[i + 1].index : lines.length;
+        const body = [];
+        for (let j = current.index + 1; j < nextIndex; j += 1) {
+          const line = lines[j].trim();
+          if (!line) continue;
+          if (excluded.has(line)) continue;
+          body.push(line);
+        }
+        sections[current.name] = body;
+      }
+
+      sections["页面结果"] = summaryInfo.resultLines;
+      return sections;
+    }
+
+    function renderSections(sections) {
+      const htmlParts = [];
+      SECTION_ORDER.forEach(name => {
+        const lines = sections[name] || [];
+        const wide = ["页面结果", "最新交易日score排行", "新增信号详细", "最近命中明细", "最近卖出明细"].includes(name);
+        const body = lines.length
+          ? lines.map(line => `<div class="line">${escapeHtml(line)}</div>`).join("")
+          : `<div class="empty">暂无</div>`;
+        htmlParts.push(`
+          <section class="section${wide ? " wide" : ""}">
+            <h3>${escapeHtml(name)}</h3>
+            ${body}
+          </section>
+        `);
+      });
+      gridEl.innerHTML = htmlParts.join("");
+    }
+
+    function renderPayload(payload) {
+      const lines = splitLines(payload.text);
+      const summaryInfo = extractSummary(lines, payload);
+      const sections = parseSections(lines, summaryInfo);
+      panelEyebrow.textContent = summaryInfo.summary.title || (currentStrategy === "v7" ? "V7 Pro" : "V8 Pro");
+      panelTitle.textContent = currentStrategy === "v7" ? "V7 策略结果" : "V8 策略结果";
+      const badges = [
+        summaryInfo.summary.latestTrade || "最新交易日: -",
+        `最后缓存时间: ${payload.cached_at || "-"}`,
+        `结果来源: ${resultSource(payload)}`
+      ];
+      if (summaryInfo.summary.stats) badges.push(summaryInfo.summary.stats);
+      if (payload.error) badges.push("刷新失败，已回退缓存");
+      badgesEl.innerHTML = badges.map(item => `<div class="badge">${escapeHtml(item)}</div>`).join("");
+      renderSections(sections);
+    }
+
+    async function fetchJson(url) {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    }
+
+    function getBaseUrl() {
+      const value = baseUrlInput.value.trim().replace(/\/+$/, "");
+      if (!value) {
+        throw new Error("请先填写 SCF 域名");
+      }
+      localStorage.setItem(STORAGE_KEY, value);
+      return value;
+    }
+
+    async function loadStrategy(strategy, refresh = false) {
+      currentStrategy = strategy;
+      setActiveButton();
+      try {
+        const baseUrl = getBaseUrl();
+        const url = `${baseUrl}/api/${strategy}?mode=json${refresh ? "&refresh=1" : ""}`;
+        statusEl.textContent = `请求中: ${url}`;
+        const payload = await fetchJson(url);
+        statusEl.innerHTML = `<strong>完成</strong> | strategy=${escapeHtml(payload.strategy)} | 来源=${escapeHtml(resultSource(payload))} | 缓存时间=${escapeHtml(payload.cached_at || "-")}`;
+        renderPayload(payload);
+      } catch (error) {
+        statusEl.textContent = `请求失败: ${error.message}`;
+        badgesEl.innerHTML = "";
+        gridEl.innerHTML = `<section class="section wide"><h3>错误</h3><div class="line">${escapeHtml(error.message)}</div></section>`;
+      }
+    }
+
+    async function refreshBoth() {
+      try {
+        const baseUrl = getBaseUrl();
+        const url = `${baseUrl}/api/cache/refresh`;
+        statusEl.textContent = `刷新中: ${url}`;
+        const payload = await fetchJson(url);
+        statusEl.innerHTML = "<strong>已完成</strong> | 双策略缓存已刷新";
+        const current = payload.results.find(item => item.strategy === currentStrategy) || payload.results[0];
+        if (current) {
+          renderPayload(current);
+        }
+      } catch (error) {
+        statusEl.textContent = `刷新失败: ${error.message}`;
+      }
+    }
+
+    btnV7.addEventListener("click", () => loadStrategy("v7"));
+    btnV8.addEventListener("click", () => loadStrategy("v8"));
+    btnRefresh.addEventListener("click", refreshBoth);
+    setActiveButton();
+  </script>
+</body>
+</html>
