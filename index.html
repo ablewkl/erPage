@@ -29,9 +29,17 @@
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     }
+    body.loading {
+      overflow: hidden;
+    }
     .shell {
       width: min(920px, calc(100vw - 20px));
       margin: 14px auto 28px;
+    }
+    body.loading .shell {
+      pointer-events: none;
+      user-select: none;
+      filter: saturate(.9);
     }
     .hero, .panel {
       background: var(--panel);
@@ -180,6 +188,57 @@
       font-size: 13px;
       padding-top: 2px;
     }
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(3, 8, 18, 0.62);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease;
+      z-index: 999;
+    }
+    body.loading .loading-overlay {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .loading-card {
+      min-width: 180px;
+      max-width: 240px;
+      padding: 18px 18px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(86, 212, 255, 0.16);
+      background: rgba(16, 26, 45, 0.98);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+      text-align: center;
+    }
+    .loading-spinner {
+      width: 32px;
+      height: 32px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      border: 3px solid rgba(86, 212, 255, 0.18);
+      border-top-color: var(--accent);
+      animation: spin .8s linear infinite;
+    }
+    .loading-title {
+      font-size: 15px;
+      color: var(--text);
+      line-height: 1.3;
+    }
+    .loading-subtitle {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
     @media (min-width: 900px) {
       .shell {
         width: min(1320px, calc(100vw - 28px));
@@ -213,7 +272,7 @@
   <main class="shell">
     <section class="hero">
       <h1>ETF 策略面板</h1>
-      <p>输入口令后再查看数据。页面不保存口令，也不会在本地做任何记录。</p>
+      <p>策略结果缓存在当前浏览器。口令只在当前页面内存里使用，不做本地保存。</p>
       <div class="login">
         <input id="passwordInput" class="password" type="password" inputmode="numeric" placeholder="输入访问口令" />
         <button id="unlockBtn" class="unlock">进入</button>
@@ -235,6 +294,13 @@
       <div class="grid" id="grid"></div>
     </section>
   </main>
+  <div class="loading-overlay" id="loadingOverlay" aria-hidden="true">
+    <div class="loading-card" role="status" aria-live="polite">
+      <div class="loading-spinner"></div>
+      <div class="loading-title" id="loadingTitle">请求中</div>
+      <div class="loading-subtitle" id="loadingSubtitle">正在获取最新策略结果</div>
+    </div>
+  </div>
 
   <script>
     const DEFAULT_BASE_URL = "https://1258557411-28azoctxlh.ap-guangzhou.tencentscf.com";
@@ -249,15 +315,22 @@
     const btnV7 = document.getElementById("btnV7");
     const btnV8 = document.getElementById("btnV8");
     const btnRefresh = document.getElementById("btnRefresh");
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    const loadingTitle = document.getElementById("loadingTitle");
+    const loadingSubtitle = document.getElementById("loadingSubtitle");
+
+    const CACHE_PREFIX = "etf_strategy_cache_v1";
+    const WINDOW_START_MINUTE = 9 * 60 + 10;
+    const WINDOW_END_MINUTE = 16 * 60;
 
     let currentStrategy = "v7";
     let currentPassword = "";
 
     const SECTION_ORDER = [
-      "页面结果",
       "卖出计划",
       "当前待结算持仓",
       "买入计划",
+      "页面结果",
       "最新交易日score排行",
       "新增信号详细",
       "买入条件",
@@ -286,9 +359,63 @@
       "卖出:": "最近卖出明细"
     };
 
+    function todayKey() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    function currentMinuteOfDay() {
+      const now = new Date();
+      return now.getHours() * 60 + now.getMinutes();
+    }
+
+    function isRefreshWindow() {
+      const minute = currentMinuteOfDay();
+      return minute >= WINDOW_START_MINUTE && minute <= WINDOW_END_MINUTE;
+    }
+
+    function cacheStorageKey(strategy) {
+      return `${CACHE_PREFIX}:${strategy}:${todayKey()}`;
+    }
+
+    function loadFrontCache(strategy) {
+      try {
+        const raw = localStorage.getItem(cacheStorageKey(strategy));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || parsed.date !== todayKey()) return null;
+        return parsed.payload || null;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveFrontCache(strategy, payload) {
+      const wrapped = {
+        strategy,
+        date: todayKey(),
+        cached_at: new Date().toISOString(),
+        payload: {
+          ...payload,
+          front_cached: true
+        }
+      };
+      localStorage.setItem(cacheStorageKey(strategy), JSON.stringify(wrapped));
+    }
+
     function setStatus(message, isError = false) {
       statusEl.textContent = message;
       statusEl.classList.toggle("error", isError);
+    }
+
+    function setLoading(active, title = "请求中", subtitle = "正在获取最新策略结果") {
+      document.body.classList.toggle("loading", active);
+      loadingOverlay.setAttribute("aria-hidden", active ? "false" : "true");
+      loadingTitle.textContent = title;
+      loadingSubtitle.textContent = subtitle;
     }
 
     function setActiveButton() {
@@ -310,10 +437,8 @@
     }
 
     function resultSource(payload) {
-      if (payload.error && payload.cached_at) return "刷新失败，已回退缓存";
-      if (payload.refreshed) return "自动刷新";
-      if (payload.cached) return "缓存";
-      return "未知";
+      if (payload.front_cached) return "前端缓存";
+      return "实时请求";
     }
 
     function extractSummary(lines, payload) {
@@ -360,7 +485,6 @@
       ];
       if (summary.stats) resultLines.push(summary.stats);
       if (summary.latestAccount) resultLines.push(summary.latestAccount);
-      if (payload.error) resultLines.push(`本次刷新失败，已回退缓存: ${payload.error}`);
       if (summary.yearlyTitle) resultLines.push(summary.yearlyTitle);
       if (summary.yearlyLines.length) resultLines.push(...summary.yearlyLines);
 
@@ -428,7 +552,6 @@
         `结果来源: ${resultSource(payload)}`
       ];
       if (summaryInfo.summary.stats) badges.push(summaryInfo.summary.stats);
-      if (payload.error) badges.push("刷新失败，已回退缓存");
       badgesEl.innerHTML = badges.map(item => `<div class="badge">${escapeHtml(item)}</div>`).join("");
       renderSections(sections);
     }
@@ -442,46 +565,67 @@
       return payload;
     }
 
-    function buildUrl(path, extra = "") {
+    function buildUrl(path) {
       const password = currentPassword.trim();
       if (!password) {
         throw new Error("请先输入口令");
       }
-      return `${baseUrl}${path}?mode=json&password=${encodeURIComponent(password)}${extra}`;
+      return `${baseUrl}${path}?mode=json&password=${encodeURIComponent(password)}`;
     }
 
-    async function loadStrategy(strategy, refresh = false) {
+    function shouldUseFrontCache(strategy) {
+      if (isRefreshWindow()) {
+        return false;
+      }
+      return Boolean(loadFrontCache(strategy));
+    }
+
+    async function loadStrategy(strategy, forceNetwork = false) {
       currentStrategy = strategy;
       setActiveButton();
       try {
-        const url = buildUrl(`/api/${strategy}`, refresh ? "&refresh=1" : "");
+        if (!currentPassword.trim()) {
+          throw new Error("请先输入口令");
+        }
+
+        if (!forceNetwork && shouldUseFrontCache(strategy)) {
+          const cached = loadFrontCache(strategy);
+          if (cached) {
+            setStatus(`完成 | ${strategy.toUpperCase()} | 前端缓存 | ${cached.cached_at || "-"}`);
+            renderPayload(cached);
+            return;
+          }
+        }
+
+        const url = buildUrl(`/api/${strategy}`);
         setStatus(`请求中: ${strategy.toUpperCase()}`);
+        setLoading(true, "请求中", `正在获取 ${strategy.toUpperCase()} 最新结果`);
         const payload = await fetchJson(url);
-        setStatus(`完成 | ${payload.strategy.toUpperCase()} | ${resultSource(payload)} | ${payload.cached_at || "-"}`);
-        renderPayload(payload);
+        saveFrontCache(strategy, payload);
+        const cachedPayload = loadFrontCache(strategy) || payload;
+        setStatus(`完成 | ${payload.strategy.toUpperCase()} | 实时请求 | ${payload.cached_at || "-"}`);
+        renderPayload(cachedPayload);
       } catch (error) {
         setStatus(`请求失败: ${error.message}`, true);
         badgesEl.innerHTML = "";
         gridEl.innerHTML = `<section class="section wide"><h3>错误</h3><div class="line">${escapeHtml(error.message)}</div></section>`;
+      } finally {
+        setLoading(false);
       }
     }
 
     async function refreshBoth() {
       try {
-        const password = currentPassword.trim();
-        if (!password) {
+        if (!currentPassword.trim()) {
           throw new Error("请先输入口令");
         }
-        const url = `${baseUrl}/api/cache/refresh?password=${encodeURIComponent(password)}`;
         setStatus("刷新中: 双策略缓存");
-        const payload = await fetchJson(url);
-        setStatus("已完成 | 双策略缓存已刷新");
-        const current = payload.results.find(item => item.strategy === currentStrategy) || payload.results[0];
-        if (current) {
-          renderPayload(current);
-        }
+        setLoading(true, "刷新缓存", "正在重新请求并覆盖前端缓存");
+        await loadStrategy(currentStrategy, true);
       } catch (error) {
         setStatus(`刷新失败: ${error.message}`, true);
+      } finally {
+        setLoading(false);
       }
     }
 
