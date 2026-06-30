@@ -2,87 +2,101 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ETF 策略面板</title>
   <style>
     :root {
       color-scheme: dark;
       --bg: #08111f;
-      --panel: #101a2d;
-      --panel-2: #0c1526;
-      --line: #23314d;
+      --panel: rgba(16, 26, 45, 0.96);
+      --panel-2: rgba(8, 17, 31, 0.82);
+      --line: rgba(86, 212, 255, 0.14);
       --text: #edf3ff;
       --muted: #9fb0cf;
       --accent: #56d4ff;
       --accent-2: #6ee7b7;
       --warn: #fde68a;
+      --danger: #fca5a5;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-      color: var(--text);
       background:
-        radial-gradient(circle at top left, rgba(86, 212, 255, .15), transparent 24%),
-        radial-gradient(circle at top right, rgba(110, 231, 183, .12), transparent 20%),
+        radial-gradient(circle at top left, rgba(86, 212, 255, .16), transparent 24%),
+        radial-gradient(circle at top right, rgba(110, 231, 183, .10), transparent 18%),
         linear-gradient(180deg, #07101d 0%, #08111f 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     }
     .shell {
-      width: min(1380px, calc(100vw - 28px));
-      margin: 18px auto 40px;
+      width: min(920px, calc(100vw - 20px));
+      margin: 14px auto 28px;
     }
-    .topbar, .panel {
-      background: rgba(16, 26, 45, 0.96);
-      border: 1px solid rgba(86, 212, 255, 0.14);
+    .hero, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
       border-radius: 8px;
-      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
     }
-    .topbar {
-      padding: 18px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
-      margin-bottom: 18px;
+    .hero {
+      padding: 18px 16px;
+      margin-bottom: 14px;
     }
-    .topbar h1 {
+    .hero h1 {
       margin: 0;
-      font-size: 26px;
+      font-size: 22px;
       line-height: 1.15;
     }
-    .topbar p {
+    .hero p {
       margin: 8px 0 0;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1.7;
+    }
+    .login {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+    .password {
+      width: 100%;
+      height: 44px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: rgba(8, 17, 31, 0.78);
+      color: var(--text);
+      padding: 0 12px;
+      outline: none;
+      font-size: 16px;
+    }
+    .unlock {
+      height: 44px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #06101d;
+      font-weight: 700;
+      cursor: pointer;
     }
     .toolbar {
       display: flex;
+      gap: 8px;
       flex-wrap: wrap;
-      gap: 10px;
-      justify-content: flex-end;
-      max-width: 56%;
-    }
-    .toolbar input {
-      width: 360px;
-      max-width: 100%;
-      height: 42px;
-      padding: 0 12px;
-      border-radius: 8px;
-      border: 1px solid rgba(86, 212, 255, 0.14);
-      background: rgba(8, 17, 31, 0.78);
-      color: var(--text);
-      outline: none;
+      margin-top: 14px;
     }
     .toolbar button {
-      height: 42px;
+      min-width: 78px;
+      height: 40px;
       padding: 0 14px;
-      border: 1px solid rgba(86, 212, 255, 0.14);
       border-radius: 8px;
+      border: 1px solid var(--line);
       background: rgba(8, 17, 31, 0.78);
       color: var(--text);
       cursor: pointer;
+      font-size: 14px;
     }
     .toolbar button.active {
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
@@ -91,62 +105,61 @@
       font-weight: 700;
     }
     .toolbar button.warn {
-      border-color: rgba(253, 230, 138, 0.28);
       color: var(--warn);
+      border-color: rgba(253, 230, 138, 0.26);
     }
+    .status {
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--muted);
+      min-height: 20px;
+    }
+    .status strong { color: var(--text); }
+    .status.error { color: var(--danger); }
     .panel {
       overflow: hidden;
     }
     .panel-header {
-      padding: 22px 22px 18px;
+      padding: 16px;
       border-bottom: 1px solid rgba(159, 176, 207, 0.12);
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 18px;
     }
     .eyebrow {
       color: var(--accent);
       font-size: 12px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     .panel-header h2 {
       margin: 0;
-      font-size: 24px;
-      line-height: 1.15;
+      font-size: 20px;
+      line-height: 1.2;
     }
     .badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      justify-content: flex-end;
-      max-width: 62%;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-top: 12px;
     }
     .badge {
-      min-width: 180px;
-      padding: 10px 12px;
+      padding: 9px 10px;
       border-radius: 8px;
       background: rgba(8, 17, 31, 0.78);
       border: 1px solid rgba(86, 212, 255, 0.12);
       color: var(--muted);
       font-size: 12px;
-      line-height: 1.6;
+      line-height: 1.5;
     }
     .grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-      padding: 18px;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 14px;
     }
     .section {
-      background: rgba(8, 17, 31, 0.8);
+      background: var(--panel-2);
       border: 1px solid rgba(159, 176, 207, 0.14);
       border-radius: 8px;
-      padding: 14px 14px 10px;
-      min-height: 110px;
-    }
-    .section.wide {
-      grid-column: 1 / -1;
+      padding: 12px 12px 8px;
     }
     .section h3 {
       margin: 0 0 10px;
@@ -156,7 +169,7 @@
     .line {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
       font-size: 12px;
-      line-height: 1.7;
+      line-height: 1.68;
       color: #dce6ff;
       padding: 2px 0;
       word-break: break-word;
@@ -165,55 +178,58 @@
     .empty {
       color: var(--muted);
       font-size: 13px;
-      padding-top: 4px;
+      padding-top: 2px;
     }
-    .status {
-      margin-top: 12px;
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .status strong {
-      color: var(--text);
-    }
-    @media (max-width: 980px) {
-      .topbar, .panel-header {
-        flex-direction: column;
+    @media (min-width: 900px) {
+      .shell {
+        width: min(1320px, calc(100vw - 28px));
+        margin: 18px auto 36px;
       }
-      .toolbar, .badges {
-        justify-content: flex-start;
-        max-width: none;
+      .hero {
+        padding: 20px;
+      }
+      .login {
+        grid-template-columns: 280px auto;
+        justify-content: start;
+      }
+      .panel-header {
+        padding: 20px;
+      }
+      .badges {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
       .grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        padding: 18px;
       }
       .section.wide {
-        grid-column: auto;
+        grid-column: 1 / -1;
       }
     }
   </style>
 </head>
 <body>
   <main class="shell">
-    <section class="topbar">
-      <div>
-        <h1>ETF 策略面板</h1>
-        <p>这个页面部署到 Gitee Pages，前端只负责展示；策略计算与缓存都走你的 SCF JSON 接口。</p>
-        <div class="status" id="status">等待请求</div>
+    <section class="hero">
+      <h1>ETF 策略面板</h1>
+      <p>输入口令后再查看数据。页面不保存口令，也不会在本地做任何记录。</p>
+      <div class="login">
+        <input id="passwordInput" class="password" type="password" inputmode="numeric" placeholder="输入访问口令" />
+        <button id="unlockBtn" class="unlock">进入</button>
       </div>
       <div class="toolbar">
-        <input id="baseUrl" placeholder="填写你的 SCF 域名，例如 https://xxx.ap-guangzhou.tencentscf.com" />
         <button id="btnV7" class="active">V7</button>
         <button id="btnV8">V8</button>
-        <button id="btnRefresh" class="warn">强制刷新缓存</button>
+        <button id="btnRefresh" class="warn">刷新缓存</button>
       </div>
+      <div class="status" id="status">等待输入口令</div>
     </section>
 
     <section class="panel">
       <div class="panel-header">
-        <div>
-          <div class="eyebrow" id="panelEyebrow">未加载</div>
-          <h2 id="panelTitle">策略结果</h2>
-        </div>
+        <div class="eyebrow" id="panelEyebrow">未加载</div>
+        <h2 id="panelTitle">策略结果</h2>
         <div class="badges" id="badges"></div>
       </div>
       <div class="grid" id="grid"></div>
@@ -221,8 +237,10 @@
   </main>
 
   <script>
-    const STORAGE_KEY = "etf_scf_base_url";
-    const baseUrlInput = document.getElementById("baseUrl");
+    const DEFAULT_BASE_URL = "https://1258557411-28azoctxlh.ap-guangzhou.tencentscf.com";
+    const baseUrl = DEFAULT_BASE_URL.replace(/\/+$/, "");
+    const passwordInput = document.getElementById("passwordInput");
+    const unlockBtn = document.getElementById("unlockBtn");
     const statusEl = document.getElementById("status");
     const panelEyebrow = document.getElementById("panelEyebrow");
     const panelTitle = document.getElementById("panelTitle");
@@ -233,6 +251,7 @@
     const btnRefresh = document.getElementById("btnRefresh");
 
     let currentStrategy = "v7";
+    let currentPassword = "";
 
     const SECTION_ORDER = [
       "页面结果",
@@ -267,7 +286,10 @@
       "卖出:": "最近卖出明细"
     };
 
-    baseUrlInput.value = localStorage.getItem(STORAGE_KEY) || "";
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle("error", isError);
+    }
 
     function setActiveButton() {
       btnV7.classList.toggle("active", currentStrategy === "v7");
@@ -279,7 +301,7 @@
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
-        .replace(/\"/g, "&quot;")
+        .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
     }
 
@@ -288,15 +310,9 @@
     }
 
     function resultSource(payload) {
-      if (payload.error && payload.cached_at) {
-        return "刷新失败，已回退缓存";
-      }
-      if (payload.refreshed) {
-        return "自动刷新";
-      }
-      if (payload.cached) {
-        return "缓存";
-      }
+      if (payload.error && payload.cached_at) return "刷新失败，已回退缓存";
+      if (payload.refreshed) return "自动刷新";
+      if (payload.cached) return "缓存";
       return "未知";
     }
 
@@ -329,12 +345,8 @@
           const yearlyLines = [];
           for (let j = i + 1; j < lines.length; j += 1) {
             const next = lines[j].trim();
-            if (!next) {
-              break;
-            }
-            if (HEADING_MAP[next]) {
-              break;
-            }
+            if (!next) break;
+            if (HEADING_MAP[next]) break;
             yearlyLines.push(next);
           }
           summary.yearlyLines = yearlyLines;
@@ -357,9 +369,7 @@
 
     function parseSections(lines, summaryInfo) {
       const sections = {};
-      SECTION_ORDER.forEach(name => {
-        sections[name] = [];
-      });
+      SECTION_ORDER.forEach(name => { sections[name] = []; });
 
       const excluded = new Set();
       if (summaryInfo.summary.latestAccount) excluded.add(summaryInfo.summary.latestAccount);
@@ -369,9 +379,7 @@
       const headingIndexes = [];
       lines.forEach((line, index) => {
         const name = HEADING_MAP[line.trim()];
-        if (name) {
-          headingIndexes.push({ index, name });
-        }
+        if (name) headingIndexes.push({ index, name });
       });
 
       for (let i = 0; i < headingIndexes.length; i += 1) {
@@ -380,8 +388,7 @@
         const body = [];
         for (let j = current.index + 1; j < nextIndex; j += 1) {
           const line = lines[j].trim();
-          if (!line) continue;
-          if (excluded.has(line)) continue;
+          if (!line || excluded.has(line)) continue;
           body.push(line);
         }
         sections[current.name] = body;
@@ -392,21 +399,21 @@
     }
 
     function renderSections(sections) {
-      const htmlParts = [];
+      const blocks = [];
       SECTION_ORDER.forEach(name => {
         const lines = sections[name] || [];
         const wide = ["页面结果", "最新交易日score排行", "新增信号详细", "最近命中明细", "最近卖出明细"].includes(name);
         const body = lines.length
           ? lines.map(line => `<div class="line">${escapeHtml(line)}</div>`).join("")
           : `<div class="empty">暂无</div>`;
-        htmlParts.push(`
+        blocks.push(`
           <section class="section${wide ? " wide" : ""}">
             <h3>${escapeHtml(name)}</h3>
             ${body}
           </section>
         `);
       });
-      gridEl.innerHTML = htmlParts.join("");
+      gridEl.innerHTML = blocks.join("");
     }
 
     function renderPayload(payload) {
@@ -428,33 +435,32 @@
 
     async function fetchJson(url) {
       const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
       }
-      return response.json();
+      return payload;
     }
 
-    function getBaseUrl() {
-      const value = baseUrlInput.value.trim().replace(/\/+$/, "");
-      if (!value) {
-        throw new Error("请先填写 SCF 域名");
+    function buildUrl(path, extra = "") {
+      const password = currentPassword.trim();
+      if (!password) {
+        throw new Error("请先输入口令");
       }
-      localStorage.setItem(STORAGE_KEY, value);
-      return value;
+      return `${baseUrl}${path}?mode=json&password=${encodeURIComponent(password)}${extra}`;
     }
 
     async function loadStrategy(strategy, refresh = false) {
       currentStrategy = strategy;
       setActiveButton();
       try {
-        const baseUrl = getBaseUrl();
-        const url = `${baseUrl}/api/${strategy}?mode=json${refresh ? "&refresh=1" : ""}`;
-        statusEl.textContent = `请求中: ${url}`;
+        const url = buildUrl(`/api/${strategy}`, refresh ? "&refresh=1" : "");
+        setStatus(`请求中: ${strategy.toUpperCase()}`);
         const payload = await fetchJson(url);
-        statusEl.innerHTML = `<strong>完成</strong> | strategy=${escapeHtml(payload.strategy)} | 来源=${escapeHtml(resultSource(payload))} | 缓存时间=${escapeHtml(payload.cached_at || "-")}`;
+        setStatus(`完成 | ${payload.strategy.toUpperCase()} | ${resultSource(payload)} | ${payload.cached_at || "-"}`);
         renderPayload(payload);
       } catch (error) {
-        statusEl.textContent = `请求失败: ${error.message}`;
+        setStatus(`请求失败: ${error.message}`, true);
         badgesEl.innerHTML = "";
         gridEl.innerHTML = `<section class="section wide"><h3>错误</h3><div class="line">${escapeHtml(error.message)}</div></section>`;
       }
@@ -462,20 +468,34 @@
 
     async function refreshBoth() {
       try {
-        const baseUrl = getBaseUrl();
-        const url = `${baseUrl}/api/cache/refresh`;
-        statusEl.textContent = `刷新中: ${url}`;
+        const password = currentPassword.trim();
+        if (!password) {
+          throw new Error("请先输入口令");
+        }
+        const url = `${baseUrl}/api/cache/refresh?password=${encodeURIComponent(password)}`;
+        setStatus("刷新中: 双策略缓存");
         const payload = await fetchJson(url);
-        statusEl.innerHTML = "<strong>已完成</strong> | 双策略缓存已刷新";
+        setStatus("已完成 | 双策略缓存已刷新");
         const current = payload.results.find(item => item.strategy === currentStrategy) || payload.results[0];
         if (current) {
           renderPayload(current);
         }
       } catch (error) {
-        statusEl.textContent = `刷新失败: ${error.message}`;
+        setStatus(`刷新失败: ${error.message}`, true);
       }
     }
 
+    function unlockAndLoad() {
+      currentPassword = passwordInput.value;
+      loadStrategy(currentStrategy);
+    }
+
+    unlockBtn.addEventListener("click", unlockAndLoad);
+    passwordInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        unlockAndLoad();
+      }
+    });
     btnV7.addEventListener("click", () => loadStrategy("v7"));
     btnV8.addEventListener("click", () => loadStrategy("v8"));
     btnRefresh.addEventListener("click", refreshBoth);
