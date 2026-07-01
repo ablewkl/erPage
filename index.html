@@ -455,12 +455,31 @@
       return `${CACHE_PREFIX}:${strategy}:${todayKey()}`;
     }
 
+    function isPayloadStructurallyValid(strategy, payload) {
+      if (!payload || typeof payload.text !== "string") return false;
+      const text = payload.text;
+      if (!text.includes("最新交易日score排行")) return false;
+      if (!text.includes("卖出计划")) return false;
+      if (strategy === "v7" && !text.includes("最新V7挂单计划")) return false;
+      if (strategy === "v8" && !text.includes("最新V8买入计划")) return false;
+
+      const lines = splitLines(text);
+      const summaryInfo = extractSummary(lines, payload);
+      const sections = parseSections(lines, summaryInfo);
+      const rankCount = (sections["最新交易日score排行"] || []).length;
+      return rankCount >= 20;
+    }
+
     function loadFrontCache(strategy) {
       try {
         const raw = localStorage.getItem(cacheStorageKey(strategy));
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         if (!parsed || parsed.date !== todayKey()) return null;
+        if (!parsed.payload || !isPayloadStructurallyValid(strategy, parsed.payload)) {
+          localStorage.removeItem(cacheStorageKey(strategy));
+          return null;
+        }
         return parsed.payload || null;
       } catch {
         return null;
@@ -468,6 +487,9 @@
     }
 
     function saveFrontCache(strategy, payload) {
+      if (!isPayloadStructurallyValid(strategy, payload)) {
+        throw new Error("返回的数据不完整，已放弃写入缓存");
+      }
       const wrapped = {
         strategy,
         date: todayKey(),
@@ -835,8 +857,12 @@
         setLoading(true, "请求中", `正在获取 ${strategy.toUpperCase()} 最新结果`);
         const payload = await fetchJson(url);
         saveFrontCache(strategy, payload);
+        const cachedPayload = loadFrontCache(strategy);
+        if (!cachedPayload) {
+          throw new Error("缓存校验失败，已拒绝使用不完整数据");
+        }
         setStatus(`完成 | ${payload.strategy.toUpperCase()} | 实时请求 | ${payload.cached_at || "-"}`);
-        renderPayload({ ...payload, front_cached: false });
+        renderPayload(cachedPayload);
       } catch (error) {
         const message = error.message || "请求失败";
         if (isPasswordError(message)) {
