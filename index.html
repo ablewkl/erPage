@@ -408,6 +408,7 @@
     let currentStrategy = "v7";
     let currentPassword = "";
     let currentPayload = null;
+    let staleCacheWarnedKey = '';
 
     const SECTION_ORDER = [
       "卖出计划",
@@ -689,11 +690,7 @@
 
           if (!Number.isFinite(signalClose) || signalClose <= 0) continue;
 
-          entries.set(code, {
-            name,
-            code,
-            signalClose
-          });
+          entries.set(code, { name, code, signalClose, orderPrice: orderPriceMatch ? Number(orderPriceMatch[1]) : (pendingOrderMatch ? Number(pendingOrderMatch[1]) : null) });
         }
       }
 
@@ -732,7 +729,7 @@
         return `
           <div class="sizing-item">
             <strong>${escapeHtml(item.name)}</strong>: ${escapeHtml(formatShares(shares))} 份
-            <span> | 收盘价 ${escapeHtml(item.signalClose.toFixed(3))}</span>
+            <span> | 收盘价 ${escapeHtml(item.signalClose.toFixed(3))}${item.orderPrice && Number.isFinite(item.orderPrice) ? ` | 挂单价 ${escapeHtml(item.orderPrice.toFixed(3))}` : ""}</span>
           </div>
         `;
       });
@@ -740,6 +737,34 @@
       sizingListEl.innerHTML = blocks.join("");
     }
 
+    
+    function isTodayBefore1530() {
+      const now = new Date();
+      return now.getHours() < 15 || (now.getHours() === 15 && now.getMinutes() < 30);
+    }
+
+    function parseCachedAt(value) {
+      if (!value) return null;
+      const text = String(value).trim().replace(' ', 'T');
+      const parsed = new Date(text);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function maybeWarnStaleCache(payload) {
+      const cachedAt = parseCachedAt(payload && payload.cached_at);
+      if (!cachedAt) return;
+      if (!isTodayBefore1530()) return;
+      const today = todayKey();
+      const cachedDay = `${cachedAt.getFullYear()}-${String(cachedAt.getMonth() + 1).padStart(2, '0')}-${String(cachedAt.getDate()).padStart(2, '0')}`;
+      if (cachedDay !== today) return;
+      const threshold = new Date(cachedAt);
+      threshold.setHours(15, 30, 0, 0);
+      if (cachedAt >= threshold) return;
+      const warnKey = `${currentStrategy}:${payload.cached_at}`;
+      if (staleCacheWarnedKey === warnKey) return;
+      staleCacheWarnedKey = warnKey;
+      window.alert('当前的数据可能不是最新!建议重新获取一次!');
+    }
     function renderPayload(payload) {
       currentPayload = payload;
       const lines = splitLines(payload.text);
@@ -759,6 +784,7 @@
 
       renderSections(sections);
       renderSizingFromPayload(payload);
+      maybeWarnStaleCache(payload);
     }
 
     async function fetchJson(url) {
@@ -888,3 +914,4 @@
   </script>
 </body>
 </html>
+
