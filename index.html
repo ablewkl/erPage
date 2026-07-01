@@ -29,14 +29,16 @@
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     }
-    body.loading {
+    body.loading,
+    body.auth-locked {
       overflow: hidden;
     }
     .shell {
       width: min(920px, calc(100vw - 20px));
       margin: 14px auto 28px;
     }
-    body.loading .shell {
+    body.loading .shell,
+    body.auth-locked .shell {
       pointer-events: none;
       user-select: none;
       filter: saturate(.9);
@@ -68,8 +70,8 @@
       grid-template-columns: 1fr;
       gap: 10px;
     }
-    .password,
-    .capital {
+    .capital,
+    .password-modal-input {
       width: 100%;
       height: 44px;
       border-radius: 8px;
@@ -83,7 +85,8 @@
     .capital {
       font-variant-numeric: tabular-nums;
     }
-    .unlock {
+    .action-btn,
+    .modal-btn {
       height: 44px;
       padding: 0 16px;
       border: 0;
@@ -127,7 +130,9 @@
       color: var(--muted);
       min-height: 20px;
     }
-    .status.error { color: var(--danger); }
+    .status.error {
+      color: var(--danger);
+    }
     .sizing-card {
       margin-top: 12px;
       padding: 12px;
@@ -217,32 +222,47 @@
       font-size: 13px;
       padding-top: 2px;
     }
-    .loading-overlay {
+    .loading-overlay,
+    .auth-overlay {
       position: fixed;
       inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
-      background: rgba(3, 8, 18, 0.62);
       backdrop-filter: blur(4px);
+      transition: opacity .18s ease;
+    }
+    .loading-overlay {
+      background: rgba(3, 8, 18, 0.62);
       opacity: 0;
       pointer-events: none;
-      transition: opacity .18s ease;
       z-index: 999;
     }
     body.loading .loading-overlay {
       opacity: 1;
       pointer-events: auto;
     }
-    .loading-card {
-      min-width: 180px;
-      max-width: 240px;
+    .auth-overlay {
+      background: rgba(3, 8, 18, 0.72);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    body.auth-locked .auth-overlay {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .loading-card,
+    .auth-card {
+      width: min(360px, calc(100vw - 32px));
       padding: 18px 18px 16px;
       border-radius: 8px;
       border: 1px solid rgba(86, 212, 255, 0.16);
       background: rgba(16, 26, 45, 0.98);
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+    }
+    .loading-card {
       text-align: center;
     }
     .loading-spinner {
@@ -254,16 +274,29 @@
       border-top-color: var(--accent);
       animation: spin .8s linear infinite;
     }
-    .loading-title {
+    .loading-title,
+    .auth-title {
       color: var(--text);
       font-size: 15px;
       font-weight: 700;
     }
-    .loading-subtitle {
+    .loading-subtitle,
+    .auth-copy {
       color: var(--muted);
       font-size: 12px;
       line-height: 1.6;
       margin-top: 6px;
+    }
+    .auth-form {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .auth-error {
+      min-height: 18px;
+      font-size: 12px;
+      color: var(--danger);
+      margin-top: 8px;
     }
     @keyframes spin {
       to { transform: rotate(360deg); }
@@ -276,7 +309,7 @@
         padding: 20px;
       }
       .login {
-        grid-template-columns: minmax(0, 1fr) 180px auto;
+        grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
       }
       .badges {
@@ -293,26 +326,25 @@
     }
   </style>
 </head>
-<body>
+<body class="auth-locked">
   <main class="shell">
     <section class="hero">
       <h1>ETF 策略面板</h1>
       <p>策略结果缓存保存在当前浏览器。口令只在当前页面内存里使用，不做本地保存。金额仅用于本地估算购买份数。</p>
       <div class="login">
-        <input id="passwordInput" class="password" type="password" inputmode="numeric" placeholder="输入访问口令" />
         <input id="capitalInput" class="capital" type="text" inputmode="decimal" placeholder="当前金额，例如 20000" />
-        <button id="unlockBtn" class="unlock">进入</button>
+        <button id="amountConfirmBtn" class="action-btn">确认金额</button>
       </div>
       <div class="toolbar">
         <button id="btnV7" class="active">V7</button>
         <button id="btnV8">V8</button>
         <button id="btnRefresh" class="warn">重新获取</button>
       </div>
-      <div class="status" id="status">等待输入口令</div>
+      <div class="status" id="status">请先获取策略结果</div>
       <div class="sizing-card">
         <div class="sizing-title">信号购买数量</div>
         <div class="sizing-list" id="sizingList">
-          <div class="sizing-empty">输入金额并加载策略后显示。</div>
+          <div class="sizing-empty">请先获取策略结果。</div>
         </div>
       </div>
     </section>
@@ -335,13 +367,24 @@
     </div>
   </div>
 
+  <div class="auth-overlay" id="authOverlay" aria-hidden="false">
+    <div class="auth-card">
+      <div class="auth-title">输入访问口令</div>
+      <div class="auth-copy">输入口令后才能操作页面。</div>
+      <div class="auth-form">
+        <input id="passwordModalInput" class="password-modal-input" type="password" inputmode="numeric" placeholder="输入访问口令" />
+        <button id="passwordSubmitBtn" class="modal-btn">进入页面</button>
+      </div>
+      <div class="auth-error" id="authError"></div>
+    </div>
+  </div>
+
   <script>
     const DEFAULT_BASE_URL = "https://1258557411-28azoctxlh.ap-guangzhou.tencentscf.com";
     const baseUrl = DEFAULT_BASE_URL.replace(/\/+$/, "");
 
-    const passwordInput = document.getElementById("passwordInput");
     const capitalInput = document.getElementById("capitalInput");
-    const unlockBtn = document.getElementById("unlockBtn");
+    const amountConfirmBtn = document.getElementById("amountConfirmBtn");
     const statusEl = document.getElementById("status");
     const panelEyebrow = document.getElementById("panelEyebrow");
     const panelTitle = document.getElementById("panelTitle");
@@ -354,8 +397,12 @@
     const loadingOverlay = document.getElementById("loadingOverlay");
     const loadingTitle = document.getElementById("loadingTitle");
     const loadingSubtitle = document.getElementById("loadingSubtitle");
+    const authOverlay = document.getElementById("authOverlay");
+    const passwordModalInput = document.getElementById("passwordModalInput");
+    const passwordSubmitBtn = document.getElementById("passwordSubmitBtn");
+    const authErrorEl = document.getElementById("authError");
 
-    const CACHE_PREFIX = "etf_strategy_cache_v2";
+    const CACHE_PREFIX = "etf_strategy_cache_v3";
     const AMOUNT_STORAGE_KEY = "etf_strategy_amount_v1";
 
     let currentStrategy = "v7";
@@ -442,6 +489,15 @@
       loadingOverlay.setAttribute("aria-hidden", active ? "false" : "true");
       loadingTitle.textContent = title;
       loadingSubtitle.textContent = subtitle;
+    }
+
+    function setAuthLocked(locked, message = "") {
+      document.body.classList.toggle("auth-locked", locked);
+      authOverlay.setAttribute("aria-hidden", locked ? "false" : "true");
+      authErrorEl.textContent = message;
+      if (locked) {
+        window.setTimeout(() => passwordModalInput.focus(), 30);
+      }
     }
 
     function setActiveButton() {
@@ -594,93 +650,78 @@
     }
 
     function formatShares(value) {
-      return `${value.toLocaleString("zh-CN")}`;
+      return value.toLocaleString("zh-CN");
     }
 
-    function extractRankCloseMap(lines) {
+    function extractRankCloseMap(sections) {
       const map = new Map();
-      let inRankSection = false;
-
-      for (const rawLine of lines) {
-        const line = rawLine.trim();
-        const heading = normalizeHeading(line);
-        if (heading === "最新交易日score排行") {
-          inRankSection = true;
-          continue;
-        }
-        if (inRankSection && heading) {
-          break;
-        }
-        if (!inRankSection || !line) {
-          continue;
-        }
+      const rankLines = sections["最新交易日score排行"] || [];
+      for (const line of rankLines) {
         const matched = line.match(/\((S[HZ]\d+)\).*?close:([0-9.]+)/);
         if (matched) {
           map.set(matched[1], Number(matched[2]));
         }
       }
-
       return map;
     }
 
-    function extractBuyPlanEntries(lines) {
-      const closeMap = extractRankCloseMap(lines);
+    function extractBuyPlanEntries(lines, sections) {
+      const closeMap = extractRankCloseMap(sections);
       const entries = new Map();
-      let inBuyPlan = false;
+      const buyLines = sections["买入计划"] || [];
 
-      for (const rawLine of lines) {
-        const line = rawLine.trim();
-        const heading = normalizeHeading(line);
-        if (heading === "买入计划") {
-          inBuyPlan = true;
-          continue;
-        }
-        if (inBuyPlan && heading) {
-          break;
-        }
-        if (!inBuyPlan || !line) {
-          continue;
-        }
+      function collectFromLines(sourceLines) {
+        for (const line of sourceLines) {
+          const baseMatch = line.match(/^(.+?)\((S[HZ]\d+)\)/);
+          if (!baseMatch) continue;
 
-        const v7Match = line.match(/^(.+?)\((S[HZ]\d+)\).*?信号日收盘:([0-9.]+)/);
-        if (v7Match) {
-          entries.set(v7Match[2], {
-            name: v7Match[1],
-            code: v7Match[2],
-            signalClose: Number(v7Match[3])
-          });
-          continue;
-        }
+          const name = baseMatch[1];
+          const code = baseMatch[2];
+          const signalCloseMatch = line.match(/信号日收盘:([0-9.]+)/);
+          const buyPriceMatch = line.match(/买入价:([0-9.]+)/);
+          const orderPriceMatch = line.match(/挂单价:([0-9.]+)/);
+          const pendingOrderMatch = line.match(/计划下一交易日挂单\s*([0-9.]+)/);
 
-        const v8Match = line.match(/^(.+?)\((S[HZ]\d+)\).*?买入价:([0-9.]+)/);
-        if (v8Match) {
-          const code = v8Match[2];
-          const signalClose = closeMap.get(code) ?? Number(v8Match[3]);
+          const signalClose = signalCloseMatch
+            ? Number(signalCloseMatch[1])
+            : closeMap.get(code)
+              ?? (buyPriceMatch ? Number(buyPriceMatch[1]) : (orderPriceMatch ? Number(orderPriceMatch[1]) : (pendingOrderMatch ? Number(pendingOrderMatch[1]) : NaN)));
+
+          if (!Number.isFinite(signalClose) || signalClose <= 0) continue;
+
           entries.set(code, {
-            name: v8Match[1],
+            name,
             code,
             signalClose
           });
         }
       }
 
-      return Array.from(entries.values()).filter(item => Number.isFinite(item.signalClose) && item.signalClose > 0);
+      collectFromLines(buyLines);
+      if (!entries.size) {
+        collectFromLines(lines);
+      }
+
+      return Array.from(entries.values());
     }
 
     function renderSizingFromPayload(payload) {
       if (!payload || !payload.text) {
-        sizingListEl.innerHTML = '<div class="sizing-empty">输入金额并加载策略后显示。</div>';
+        sizingListEl.innerHTML = '<div class="sizing-empty">请先获取策略结果。</div>';
         return;
       }
 
       const amount = parseLooseNumber(capitalInput.value);
       if (!Number.isFinite(amount) || amount <= 0) {
-        sizingListEl.innerHTML = '<div class="sizing-empty">请输入当前金额后再估算份数。</div>';
+        sizingListEl.innerHTML = '<div class="sizing-empty">请输入当前金额后再确认。</div>';
         return;
       }
 
       const lines = splitLines(payload.text);
-      const entries = extractBuyPlanEntries(lines);
+      const summaryInfo = extractSummary(lines, payload);
+      const sections = parseSections(lines, summaryInfo);
+      const entries = extractBuyPlanEntries(lines, sections);
+
       if (!entries.length) {
         sizingListEl.innerHTML = '<div class="sizing-empty">当前买入计划里没有可估算的信号。</div>';
         return;
@@ -695,6 +736,7 @@
           </div>
         `;
       });
+
       sizingListEl.innerHTML = blocks.join("");
     }
 
@@ -729,15 +771,19 @@
     }
 
     function buildUrl(path) {
-      const password = currentPassword.trim();
-      if (!password) {
+      if (!currentPassword.trim()) {
         throw new Error("请先输入口令");
       }
-      return `${baseUrl}${path}?mode=json&password=${encodeURIComponent(password)}`;
+      return `${baseUrl}${path}?mode=json&password=${encodeURIComponent(currentPassword.trim())}`;
     }
 
     function shouldUseFrontCache(strategy) {
       return Boolean(loadFrontCache(strategy));
+    }
+
+    function isPasswordError(message) {
+      const text = String(message || "");
+      return text.includes("Unauthorized") || text.includes("password error");
     }
 
     async function loadStrategy(strategy, forceNetwork = false) {
@@ -763,14 +809,19 @@
         setLoading(true, "请求中", `正在获取 ${strategy.toUpperCase()} 最新结果`);
         const payload = await fetchJson(url);
         saveFrontCache(strategy, payload);
-        const cachedPayload = loadFrontCache(strategy) || { ...payload, front_cached: false };
         setStatus(`完成 | ${payload.strategy.toUpperCase()} | 实时请求 | ${payload.cached_at || "-"}`);
-        renderPayload(cachedPayload);
+        renderPayload({ ...payload, front_cached: false });
       } catch (error) {
+        const message = error.message || "请求失败";
+        if (isPasswordError(message)) {
+          currentPassword = "";
+          passwordModalInput.value = "";
+          setAuthLocked(true, "口令错误，请重新输入。");
+        }
         currentPayload = null;
-        setStatus(`请求失败: ${error.message}`, true);
+        setStatus(`请求失败: ${message}`, true);
         badgesEl.innerHTML = "";
-        gridEl.innerHTML = `<section class="section wide"><h3>错误</h3><div class="line">${escapeHtml(error.message)}</div></section>`;
+        gridEl.innerHTML = `<section class="section wide"><h3>错误</h3><div class="line">${escapeHtml(message)}</div></section>`;
         renderSizingFromPayload(null);
       } finally {
         setLoading(false);
@@ -791,28 +842,40 @@
       }
     }
 
-    function unlockAndLoad() {
-      currentPassword = passwordInput.value;
-      loadStrategy(currentStrategy);
+    function confirmAmount() {
+      localStorage.setItem(AMOUNT_STORAGE_KEY, capitalInput.value.trim());
+      if (!currentPayload) {
+        setStatus("请先获取策略结果");
+        sizingListEl.innerHTML = '<div class="sizing-empty">请先获取策略结果。</div>';
+        return;
+      }
+      setStatus("金额已确认，可查看当前买入计划份数");
+      renderSizingFromPayload(currentPayload);
     }
 
-    function handleCapitalInput() {
-      localStorage.setItem(AMOUNT_STORAGE_KEY, capitalInput.value.trim());
-      renderSizingFromPayload(currentPayload);
+    function unlockPage() {
+      const password = passwordModalInput.value.trim();
+      if (!password) {
+        setAuthLocked(true, "请输入访问口令。");
+        return;
+      }
+      currentPassword = password;
+      setAuthLocked(false);
+      setStatus("请先获取策略结果");
     }
 
     capitalInput.value = localStorage.getItem(AMOUNT_STORAGE_KEY) || "";
 
-    unlockBtn.addEventListener("click", unlockAndLoad);
-    passwordInput.addEventListener("keydown", event => {
+    passwordSubmitBtn.addEventListener("click", unlockPage);
+    passwordModalInput.addEventListener("keydown", event => {
       if (event.key === "Enter") {
-        unlockAndLoad();
+        unlockPage();
       }
     });
-    capitalInput.addEventListener("input", handleCapitalInput);
+    amountConfirmBtn.addEventListener("click", confirmAmount);
     capitalInput.addEventListener("keydown", event => {
       if (event.key === "Enter") {
-        unlockAndLoad();
+        confirmAmount();
       }
     });
     btnV7.addEventListener("click", () => loadStrategy("v7"));
@@ -821,6 +884,7 @@
 
     setActiveButton();
     renderSizingFromPayload(null);
+    setAuthLocked(true);
   </script>
 </body>
 </html>
