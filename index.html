@@ -573,7 +573,11 @@
           summary.stats = line;
           continue;
         }
-        if (!summary.latestAccount && line.startsWith("最新一次卖出账户收益")) {
+        if (
+          !summary.latestAccount &&
+          line.includes("卖出账户收益") &&
+          line.includes("复利倍数")
+        ) {
           summary.latestAccount = line;
           continue;
         }
@@ -740,12 +744,19 @@
       const summaryInfo = extractSummary(lines, payload);
       const sections = parseSections(lines, summaryInfo);
       const entries = extractBuyPlanEntries(lines, sections);
+      const latestAccountLine = summaryInfo.summary.latestAccount;
 
       if (!entries.length) {
-        sizingListEl.innerHTML = '<div class="sizing-empty">当前买入计划里没有可估算的信号。</div>';
+        sizingListEl.innerHTML = `
+          ${latestAccountLine ? `<div class="sizing-item"><strong>${escapeHtml(latestAccountLine)}</strong></div>` : ""}
+          <div class="sizing-empty">当前买入计划里没有可估算的信号。</div>
+        `;
         return;
       }
 
+      const extraBlock = latestAccountLine
+        ? `<div class="sizing-item"><strong>${escapeHtml(latestAccountLine)}</strong></div>`
+        : "";
       const blocks = entries.map(item => {
         const shares = roundToHundreds(amount / item.signalClose);
         return `
@@ -756,7 +767,7 @@
         `;
       });
 
-      sizingListEl.innerHTML = blocks.join("");
+      sizingListEl.innerHTML = `${extraBlock}${blocks.join("")}`;
     }
 
     
@@ -773,6 +784,7 @@
     }
 
     function maybeWarnStaleCache(payload) {
+      if (!payload || !payload.front_cached) return;
       const cachedAt = parseCachedAt(payload && payload.cached_at);
       if (!cachedAt) return;
       if (!isTodayBefore1530()) return;
@@ -862,7 +874,11 @@
           throw new Error("缓存校验失败，已拒绝使用不完整数据");
         }
         setStatus(`完成 | ${payload.strategy.toUpperCase()} | 实时请求 | ${payload.cached_at || "-"}`);
-        renderPayload(cachedPayload);
+        renderPayload({
+          ...cachedPayload,
+          front_cached: false,
+          cached_at: payload.cached_at || cachedPayload.cached_at
+        });
       } catch (error) {
         const message = error.message || "请求失败";
         if (isPasswordError(message)) {
