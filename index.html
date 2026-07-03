@@ -409,6 +409,7 @@
     let currentPassword = "";
     let currentPayload = null;
     let staleCacheWarnedKey = '';
+    let currentSplitMap = {};
 
     const SECTION_ORDER = [
       "卖出计划",
@@ -697,38 +698,63 @@
       const entries = new Map();
       const buyLines = sections["买入计划"] || [];
 
-      function collectFromLines(sourceLines) {
-        for (const line of sourceLines) {
-          const baseMatch = line.match(/^(.+?)\((S[HZ]\d+)\)/);
-          if (!baseMatch) continue;
+      for (const line of buyLines) {
+        const baseMatch = line.match(/^(.+?)\((S[HZ]\d+)\)/);
+        if (!baseMatch) continue;
+        if (line.startsWith("卖出前持仓数:")) continue;
 
-          const name = baseMatch[1];
-          const code = baseMatch[2];
-          const signalCloseMatch = line.match(/信号日收盘:([0-9.]+)/);
-          const buyPriceMatch = line.match(/买入价:([0-9.]+)/);
-          const orderPriceMatch = line.match(/挂单价:([0-9.]+)/);
-          const pendingOrderMatch = line.match(/计划下一交易日挂单\s*([0-9.]+)/);
+        const name = baseMatch[1];
+        const code = baseMatch[2];
+        const signalCloseMatch = line.match(/信号日收盘:([0-9.]+)/);
+        const buyPriceMatch = line.match(/买入价:([0-9.]+)/);
+        const orderPriceMatch = line.match(/挂单价:([0-9.]+)/);
+        const pendingOrderMatch = line.match(/计划下一交易日挂单\s*([0-9.]+)/);
 
-          const signalClose = signalCloseMatch
-            ? Number(signalCloseMatch[1])
-            : closeMap.get(code)
-              ?? (buyPriceMatch ? Number(buyPriceMatch[1]) : (orderPriceMatch ? Number(orderPriceMatch[1]) : (pendingOrderMatch ? Number(pendingOrderMatch[1]) : NaN)));
+        const signalClose = signalCloseMatch
+          ? Number(signalCloseMatch[1])
+          : closeMap.get(code)
+            ?? (buyPriceMatch ? Number(buyPriceMatch[1]) : (orderPriceMatch ? Number(orderPriceMatch[1]) : (pendingOrderMatch ? Number(pendingOrderMatch[1]) : NaN)));
 
-          if (!Number.isFinite(signalClose) || signalClose <= 0) continue;
+        if (!Number.isFinite(signalClose) || signalClose <= 0) continue;
 
-          entries.set(code, { name, code, signalClose, orderPrice: orderPriceMatch ? Number(orderPriceMatch[1]) : (pendingOrderMatch ? Number(pendingOrderMatch[1]) : null) });
-        }
-      }
-
-      collectFromLines(buyLines);
-      if (!entries.size) {
-        collectFromLines(lines);
+        entries.set(code, {
+          name,
+          code,
+          signalClose,
+          orderPrice: orderPriceMatch ? Number(orderPriceMatch[1]) : (pendingOrderMatch ? Number(pendingOrderMatch[1]) : null),
+        });
       }
 
       return Array.from(entries.values());
     }
 
-    function renderSizingFromPayload(payload) {
+    function formatSplitInfo(item) {
+      if (!item || !item.has_recent_split) {
+        return "近期无拆分";
+      }
+      const ratio = Number.isFinite(Number(item.split_ratio)) ? Number(item.split_ratio) : null;
+      const ratioText = ratio === null ? "-" : ratio.toString();
+      return `近期拆分: ${item.split_date || "-"} ${item.split_type || ""} ${ratioText}`.trim();
+    }
+
+    async function loadFundSplitMap(entries) {
+      const codes = Array.from(new Set((entries || []).map(item => item.code).filter(Boolean)));
+      if (!codes.length || !currentPassword.trim()) {
+        currentSplitMap = {};
+        return currentSplitMap;
+      }
+      const query = encodeURIComponent(codes.join(","));
+      const url = `${baseUrl}/api/fund/splits?password=${encodeURIComponent(currentPassword.trim())}&codes=${query}`;
+      try {
+        const payload = await fetchJson(url);
+        currentSplitMap = payload.items || {};
+      } catch {
+        currentSplitMap = {};
+      }
+      return currentSplitMap;
+    }
+
+    function renderSizingFromPayload(payload, splitMap = currentSplitMap) {
       if (!payload || !payload.text) {
         sizingListEl.innerHTML = '<div class="sizing-empty">请先获取策略结果。</div>';
         return;
@@ -759,10 +785,11 @@
         : "";
       const blocks = entries.map(item => {
         const shares = roundToHundreds(amount / item.signalClose);
+        const splitInfo = formatSplitInfo(splitMap && splitMap[item.code]);
         return `
           <div class="sizing-item">
             <strong>${escapeHtml(item.name)}</strong>: ${escapeHtml(formatShares(shares))} 份
-            <span> | 收盘价 ${escapeHtml(item.signalClose.toFixed(3))}${item.orderPrice && Number.isFinite(item.orderPrice) ? ` | 挂单价 ${escapeHtml(item.orderPrice.toFixed(3))}` : ""}</span>
+            <span> | 收盘价 ${escapeHtml(item.signalClose.toFixed(3))}${item.orderPrice && Number.isFinite(item.orderPrice) ? ` | 挂单价 ${escapeHtml(item.orderPrice.toFixed(3))}` : ""} | ${escapeHtml(splitInfo)}</span>
           </div>
         `;
       });
@@ -799,11 +826,41 @@
       staleCacheWarnedKey = warnKey;
       window.alert('当前的数据可能不是最新!建议重新获取一次!');
     }
-    function renderPayload(payload) {
+    async function enrichPlanSectionsWithSplits(sections) {
+      const sectionNames = ["买入计划", "卖出计划"];
+      const splitEntries = [];
+      const updatedSections = {};
+
+      for (const sectionName of sectionNames) {
+        const sourceLines = sections[sectionName] || [];
+        updatedSections[sectionName] = sourceLines.map(line => {
+          const baseMatch = line.match(/^(.+?)\((S[HZ]\d+)\)/);
+          if (!baseMatch) return line;
+          if (line.includes("近期拆分:") || line.includes("近期无拆分")) return line;
+          splitEntries.push({ code: baseMatch[2] });
+          return line;
+        });
+      }
+
+      const splitMap = await loadFundSplitMap(splitEntries);
+
+      for (const sectionName of sectionNames) {
+        sections[sectionName] = (updatedSections[sectionName] || []).map(line => {
+          const baseMatch = line.match(/^(.+?)\((S[HZ]\d+)\)/);
+          if (!baseMatch) return line;
+          const code = baseMatch[2];
+          return `${line} | ${formatSplitInfo(splitMap[code])}`;
+        });
+      }
+      return splitMap;
+    }
+
+    async function renderPayload(payload) {
       currentPayload = payload;
       const lines = splitLines(payload.text);
       const summaryInfo = extractSummary(lines, payload);
       const sections = parseSections(lines, summaryInfo);
+      const splitMap = await enrichPlanSectionsWithSplits(sections);
 
       panelEyebrow.textContent = summaryInfo.summary.title || (currentStrategy === "v7" ? "V7 Pro" : "V8 Pro");
       panelTitle.textContent = currentStrategy === "v7" ? "V7 策略结果" : "V8 策略结果";
@@ -817,7 +874,7 @@
       badgesEl.innerHTML = badges.map(item => `<div class="badge">${escapeHtml(item)}</div>`).join("");
 
       renderSections(sections);
-      renderSizingFromPayload(payload);
+      renderSizingFromPayload(payload, splitMap);
       maybeWarnStaleCache(payload);
     }
 
