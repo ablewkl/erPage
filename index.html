@@ -942,6 +942,8 @@
           currentPassword = "";
           passwordModalInput.value = "";
           setAuthLocked(true, "口令错误，请重新输入。");
+        } else {
+          window.alert(`请求失败: ${message}`);
         }
         currentPayload = null;
         setStatus(`请求失败: ${message}`, true);
