@@ -403,6 +403,7 @@
     const authErrorEl = document.getElementById("authError");
 
     const AMOUNT_STORAGE_KEY = "etf_strategy_amount_v1";
+    const STRATEGY_BUNDLE_STORAGE_KEY = "etf_strategy_bundle_v2";
 
     let currentStrategy = "v7";
     let currentPassword = "";
@@ -475,10 +476,44 @@
         if (!isPayloadStructurallyValid(strategy, result)) {
           throw new Error(`${strategy.toUpperCase()} 返回的数据不完整`);
         }
-        nextMap[strategy] = result;
+        nextMap[strategy] = { ...result };
       }
 
       return nextMap;
+    }
+
+    function saveStrategyBundleCache(payload) {
+      const normalized = normalizeStrategyResults(payload);
+      localStorage.setItem(
+        STRATEGY_BUNDLE_STORAGE_KEY,
+        JSON.stringify({
+          cached_at: payload && payload.cached_at ? payload.cached_at : "",
+          results: normalized
+        })
+      );
+      strategyPayloadMap = {
+        v7: { ...normalized.v7, front_cached: false },
+        v8: { ...normalized.v8, front_cached: false }
+      };
+      return strategyPayloadMap;
+    }
+
+    function loadStrategyBundleCache() {
+      try {
+        const raw = localStorage.getItem(STRATEGY_BUNDLE_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const normalized = normalizeStrategyResults(parsed);
+        strategyPayloadMap = {
+          v7: { ...normalized.v7, front_cached: true },
+          v8: { ...normalized.v8, front_cached: true }
+        };
+        return strategyPayloadMap;
+      } catch {
+        localStorage.removeItem(STRATEGY_BUNDLE_STORAGE_KEY);
+        clearStrategyPayloads();
+        return null;
+      }
     }
 
     function setStatus(message, isError = false) {
@@ -522,7 +557,7 @@
 
     function resultSource(payload) {
       if (!payload) return "-";
-      if (payload.cached) return "后端缓存";
+      if (payload.front_cached) return "前端缓存";
       if (payload.refreshed) return "最新数据";
       return "策略结果";
     }
@@ -856,13 +891,19 @@
         params.refresh = "1";
       }
       const payload = await fetchJson(buildApiUrl("/api/strategies", params));
-      strategyPayloadMap = normalizeStrategyResults(payload);
-      return strategyPayloadMap;
+      return saveStrategyBundleCache(payload);
     }
 
     function isPasswordError(message) {
       const text = String(message || "");
       return text.includes("Unauthorized") || text.includes("password error");
+    }
+
+    function isFrontendCacheMissError(message) {
+      const text = String(message || "");
+      return text.includes("暂无前端缓存")
+        || text.includes("暂无 V7 缓存结果")
+        || text.includes("暂无 V8 缓存结果");
     }
 
     function handleStrategyError(error, statusPrefix = "请求失败", preserveCurrent = false) {
@@ -874,6 +915,10 @@
         currentSplitMap = {};
         currentPayload = null;
         setAuthLocked(true, "口令错误，请重新输入。");
+      } else if (isFrontendCacheMissError(message)) {
+        badgesEl.innerHTML = "";
+        gridEl.innerHTML = `<section class="section wide"><h3>提示</h3><div class="line">${escapeHtml(message)}</div></section>`;
+        renderSizingFromPayload(null);
       } else {
         window.alert(`${statusPrefix}: ${message}`);
       }
@@ -904,15 +949,14 @@
           throw new Error("请先输入口令");
         }
         if (!strategyPayloadMap.v7 || !strategyPayloadMap.v8) {
-          setStatus("读取中: V7 / V8");
-          setLoading(true, "读取缓存", "正在读取 V7 / V8 缓存结果");
-          await fetchStrategyBundle(false);
+          const cached = loadStrategyBundleCache();
+          if (!cached) {
+            throw new Error("暂无前端缓存结果，请点击获取最新数据");
+          }
         }
         await renderCurrentStrategyFromBundle();
       } catch (error) {
         handleStrategyError(error, "读取失败", true);
-      } finally {
-        setLoading(false);
       }
     }
 
@@ -954,14 +998,17 @@
       currentSplitMap = {};
       setAuthLocked(false);
       try {
-        setStatus("读取中: V7 / V8");
-        setLoading(true, "读取缓存", "正在读取 V7 / V8 缓存结果");
-        await fetchStrategyBundle(false);
-        await renderCurrentStrategyFromBundle();
+        const cached = loadStrategyBundleCache();
+        if (cached && currentStrategyPayload()) {
+          await renderCurrentStrategyFromBundle();
+        } else {
+          setStatus("暂无前端缓存，请点击获取最新数据");
+          badgesEl.innerHTML = "";
+          gridEl.innerHTML = '<section class="section wide"><h3>提示</h3><div class="line">暂无前端缓存，请点击获取最新数据</div></section>';
+          renderSizingFromPayload(null);
+        }
       } catch (error) {
         handleStrategyError(error, "读取失败");
-      } finally {
-        setLoading(false);
       }
     }
 
@@ -985,7 +1032,7 @@
 
     setActiveButton();
     renderSizingFromPayload(null);
-    setStatus("请输入口令后读取缓存结果");
+    setStatus("请输入口令后读取前端缓存");
     setAuthLocked(true);
   </script>
 </body>
