@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -6,222 +6,785 @@
   <title>ETF 策略面板</title>
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #08111f;
-      --panel: rgba(16, 26, 45, 0.96);
-      --panel-2: rgba(8, 17, 31, 0.82);
-      --line: rgba(86, 212, 255, 0.14);
-      --text: #edf3ff;
-      --muted: #9fb0cf;
-      --accent: #56d4ff;
-      --accent-2: #6ee7b7;
-      --warn: #fde68a;
-      --danger: #fca5a5;
+      color-scheme: light;
+      --bg: #f6f1e8;
+      --bg-2: #fffaf5;
+      --surface: rgba(255, 255, 255, 0.92);
+      --surface-strong: #ffffff;
+      --surface-soft: #f9f1e6;
+      --surface-soft-2: #f4e6d8;
+      --line: rgba(121, 91, 62, 0.14);
+      --line-strong: rgba(121, 91, 62, 0.24);
+      --text: #2f241b;
+      --muted: #77685b;
+      --accent: #b65e38;
+      --accent-soft: #f6dfd2;
+      --accent-strong: #8d4121;
+      --ok: #15803d;
+      --ok-soft: #ecfdf3;
+      --danger: #c2410c;
+      --danger-soft: #fff1eb;
+      --warn: #a16207;
+      --shadow: 0 20px 56px rgba(109, 79, 50, 0.12);
     }
+
     * { box-sizing: border-box; }
-    body {
+
+    html, body {
       margin: 0;
-      min-height: 100vh;
-      background:
-        radial-gradient(circle at top left, rgba(86, 212, 255, .16), transparent 24%),
-        radial-gradient(circle at top right, rgba(110, 231, 183, .10), transparent 18%),
-        linear-gradient(180deg, #07101d 0%, #08111f 100%);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      min-height: 100%;
     }
+
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(246, 223, 210, 0.95), transparent 28%),
+        radial-gradient(circle at top right, rgba(246, 238, 221, 0.95), transparent 26%),
+        linear-gradient(180deg, #fffaf5 0%, #f6f1e8 100%);
+      color: var(--text);
+      font-family: "Avenir Next", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
     body.loading,
     body.auth-locked {
       overflow: hidden;
     }
+
     .shell {
-      width: min(920px, calc(100vw - 20px));
-      margin: 14px auto 28px;
+      width: min(1220px, calc(100vw - 28px));
+      margin: 28px auto 40px;
+      display: grid;
+      gap: 18px;
     }
+
     body.loading .shell,
     body.auth-locked .shell {
       pointer-events: none;
       user-select: none;
-      filter: saturate(.9);
+      filter: saturate(.94);
     }
-    .hero, .panel {
-      background: var(--panel);
+
+    .hero,
+    .panel {
+      background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
     }
+
     .hero {
-      padding: 18px 16px;
-      margin-bottom: 14px;
+      padding: 22px;
+      display: grid;
+      gap: 18px;
     }
+
+    .hero-copy {
+      display: grid;
+      gap: 10px;
+    }
+
+    .hero-kicker {
+      color: var(--accent);
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
     .hero h1 {
+      margin: 0;
+      font-size: clamp(28px, 5vw, 42px);
+      line-height: 1.04;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.75;
+      max-width: 760px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .toolbar button,
+    .dialog-btn,
+    .tile-btn,
+    .modal-btn {
+      border: 0;
+      cursor: pointer;
+      font-weight: 700;
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease, color .16s ease;
+    }
+
+    .toolbar button:hover,
+    .dialog-btn:hover,
+    .tile-btn:hover,
+    .modal-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .toolbar button {
+      min-width: 92px;
+      height: 42px;
+      padding: 0 18px;
+      border-radius: 999px;
+      background: var(--surface-soft);
+      color: var(--text);
+      border: 1px solid var(--line);
+      box-shadow: 0 8px 18px rgba(114, 82, 57, 0.06);
+    }
+
+    .toolbar button.active {
+      background: linear-gradient(135deg, var(--accent), #d77b4f);
+      color: #fff8f3;
+      border-color: transparent;
+      box-shadow: 0 12px 30px rgba(182, 94, 56, 0.22);
+    }
+
+    .toolbar button.warn {
+      background: #fff7eb;
+      color: var(--warn);
+      border: 1px solid rgba(161, 98, 7, 0.15);
+    }
+
+    .status {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .summary-grid,
+    .action-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .summary-grid {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .summary-card,
+    .action-tile {
+      background: var(--surface-strong);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 14px 36px rgba(114, 82, 57, 0.08);
+    }
+
+    .summary-card {
+      display: grid;
+      gap: 10px;
+      min-height: 144px;
+    }
+
+    .summary-label {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .summary-value {
+      font-size: 24px;
+      line-height: 1.18;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .summary-copy {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.72;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .panel {
+      padding: 22px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .panel-head h2 {
       margin: 0;
       font-size: 22px;
       line-height: 1.15;
     }
-    .hero p {
+
+    .panel-head p {
       margin: 8px 0 0;
       color: var(--muted);
       font-size: 13px;
       line-height: 1.7;
     }
-    .login {
-      margin-top: 16px;
+
+    .action-grid {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .action-tile {
+      display: grid;
+      gap: 12px;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .tile-btn {
+      width: 100%;
+      background: transparent;
+      padding: 18px;
+      text-align: left;
+      color: inherit;
+    }
+
+    .tile-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 12px;
+    }
+
+    .tile-title {
+      font-size: 20px;
+      line-height: 1.15;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .tile-arrow {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      flex: none;
+    }
+
+    .tile-arrow svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      stroke-width: 1.9;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .tile-copy {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.72;
+    }
+
+    .tile-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .meta-pill,
+    .chip,
+    .flag-chip,
+    .result-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      line-height: 1;
+      border: 1px solid var(--line);
+      background: var(--surface-soft);
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .meta-pill {
+      color: var(--muted);
+    }
+
+    .cache-pill {
+      color: var(--danger);
+      background: var(--danger-soft);
+      border-color: rgba(194, 65, 12, 0.18);
+      font-weight: 700;
+    }
+
+    .chip {
+      background: #fffdf9;
+    }
+
+    .chip.note {
+      background: var(--surface-soft);
+      color: var(--muted);
+    }
+
+    .flag-chip {
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      border-color: rgba(182, 94, 56, 0.16);
+      cursor: help;
+    }
+
+    .tooltip-trigger {
+      appearance: none;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .tooltip-trigger:focus-visible {
+      outline: 2px solid rgba(182, 94, 56, 0.42);
+      outline-offset: 2px;
+    }
+
+    .flag-chip.empty {
+      background: #fbf7f2;
+      color: var(--muted);
+      cursor: default;
+    }
+
+    .result-chip.ok {
+      background: var(--ok-soft);
+      color: var(--ok);
+      border-color: rgba(21, 128, 61, 0.16);
+    }
+
+    .result-chip.bad {
+      background: var(--danger-soft);
+      color: var(--danger);
+      border-color: rgba(194, 65, 12, 0.16);
+    }
+
+    .floating-tooltip {
+      position: fixed;
+      z-index: 1400;
+      max-width: min(340px, calc(100vw - 24px));
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(47, 36, 27, 0.96);
+      color: #fffaf5;
+      box-shadow: 0 18px 36px rgba(47, 36, 27, 0.28);
+      font-size: 12px;
+      line-height: 1.7;
+      pointer-events: none;
+      white-space: pre-wrap;
+    }
+
+    .floating-tooltip[hidden] {
+      display: none;
+    }
+
+    dialog {
+      width: min(1160px, calc(100vw - 24px));
+      max-width: 1160px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+    }
+
+    dialog::backdrop {
+      background: rgba(42, 28, 16, 0.38);
+      backdrop-filter: blur(5px);
+    }
+
+    .dialog-shell {
+      background: var(--surface-strong);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: 0 22px 64px rgba(86, 59, 38, 0.18);
+      overflow: hidden;
+      max-height: min(86vh, 900px);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .dialog-head {
+      padding: 20px 22px;
+      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(255, 247, 239, 0.98), rgba(255, 255, 255, 0.98)),
+        var(--surface-strong);
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .dialog-head h3 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.12;
+    }
+
+    .dialog-head p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.72;
+      white-space: pre-wrap;
+    }
+
+    .dialog-close {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fffaf5;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+      flex: none;
+    }
+
+    .dialog-body {
+      padding: 20px 22px 24px;
+      overflow: auto;
+      display: grid;
+      gap: 16px;
+      background:
+        radial-gradient(circle at top right, rgba(246, 223, 210, 0.18), transparent 26%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 245, 237, 0.98));
+    }
+
+    .dialog-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .dialog-section {
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      box-shadow: 0 12px 28px rgba(114, 82, 57, 0.07);
+    }
+
+    .dialog-section.wide {
+      grid-column: 1 / -1;
+    }
+
+    .dialog-section h4 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.2;
+    }
+
+    .section-note {
+      margin: -6px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+
+    .capital-row {
       display: grid;
       grid-template-columns: 1fr;
       gap: 10px;
     }
+
     .capital,
     .password-modal-input {
       width: 100%;
-      height: 44px;
-      border-radius: 8px;
-      border: 1px solid var(--line);
-      background: rgba(8, 17, 31, 0.78);
+      height: 48px;
+      border-radius: 16px;
+      border: 1px solid var(--line-strong);
+      background: #fffdf9;
       color: var(--text);
-      padding: 0 12px;
+      padding: 0 14px;
       outline: none;
-      font-size: 16px;
+      font-size: 15px;
     }
+
     .capital {
       font-variant-numeric: tabular-nums;
     }
-    .action-btn,
+
+    .dialog-btn,
     .modal-btn {
-      height: 44px;
-      padding: 0 16px;
-      border: 0;
-      border-radius: 8px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #06101d;
-      font-weight: 700;
-      cursor: pointer;
+      height: 48px;
+      padding: 0 18px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--accent), #d57a4e);
+      color: #fff8f3;
+      box-shadow: 0 12px 28px rgba(182, 94, 56, 0.22);
     }
-    .toolbar {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 14px;
-    }
-    .toolbar button {
-      min-width: 78px;
-      height: 40px;
-      padding: 0 14px;
-      border-radius: 8px;
-      border: 1px solid var(--line);
-      background: rgba(8, 17, 31, 0.78);
-      color: var(--text);
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .toolbar button.active {
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #06101d;
-      border-color: transparent;
-      font-weight: 700;
-    }
-    .toolbar button.warn {
-      color: var(--warn);
-      border-color: rgba(253, 230, 138, 0.26);
-    }
-    .status {
-      margin-top: 12px;
-      font-size: 13px;
-      line-height: 1.6;
-      color: var(--muted);
-      min-height: 20px;
-    }
-    .status.error {
-      color: var(--danger);
-    }
-    .sizing-card {
-      margin-top: 12px;
-      padding: 12px;
-      border-radius: 8px;
-      background: rgba(8, 17, 31, 0.72);
-      border: 1px solid rgba(86, 212, 255, 0.12);
-    }
-    .sizing-title {
-      font-size: 13px;
-      color: var(--text);
-      margin-bottom: 6px;
-    }
-    .sizing-list {
+
+    .card-list {
       display: grid;
-      gap: 6px;
-    }
-    .sizing-item,
-    .sizing-empty {
-      font-size: 13px;
-      line-height: 1.6;
-      color: var(--muted);
-    }
-    .sizing-item strong {
-      color: var(--text);
-      font-weight: 700;
-    }
-    .panel {
-      overflow: hidden;
-    }
-    .panel-header {
-      padding: 16px;
-      border-bottom: 1px solid rgba(159, 176, 207, 0.12);
-    }
-    .eyebrow {
-      color: var(--accent);
-      font-size: 12px;
-      margin-bottom: 6px;
-    }
-    .panel-header h2 {
-      margin: 0;
-      font-size: 20px;
-      line-height: 1.2;
-    }
-    .badges {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 8px;
-      margin-top: 12px;
-    }
-    .badge {
-      padding: 9px 10px;
-      border-radius: 8px;
-      background: rgba(8, 17, 31, 0.78);
-      border: 1px solid rgba(86, 212, 255, 0.12);
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.5;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr;
       gap: 12px;
+    }
+
+    .record-card {
       padding: 14px;
+      border-radius: 18px;
+      background: var(--bg-2);
+      border: 1px solid rgba(121, 91, 62, 0.1);
+      display: grid;
+      gap: 10px;
     }
-    .section {
-      background: var(--panel-2);
-      border: 1px solid rgba(159, 176, 207, 0.14);
-      border-radius: 8px;
-      padding: 12px 12px 8px;
+
+    .record-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
     }
-    .section h3 {
-      margin: 0 0 10px;
-      font-size: 14px;
-      color: var(--text);
+
+    .record-title {
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.35;
     }
-    .line {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-      font-size: 12px;
-      line-height: 1.68;
-      color: #dce6ff;
-      padding: 2px 0;
-      word-break: break-word;
-      white-space: pre-wrap;
-    }
-    .empty {
+
+    .record-copy {
       color: var(--muted);
       font-size: 13px;
-      padding-top: 2px;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .sizing-card {
+      gap: 0;
+    }
+
+    .sizing-card .record-head {
+      gap: 8px;
+    }
+
+    .sizing-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .sizing-metric {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 9px 14px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #fff7ef, #fff3ea);
+      border: 1px solid rgba(182, 94, 56, 0.16);
+      color: var(--accent-strong);
+      white-space: nowrap;
+    }
+
+    .sizing-metric span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .sizing-metric strong {
+      font-size: 20px;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: var(--accent-strong);
+    }
+
+    .empty {
+      padding: 16px;
+      border-radius: 18px;
+      background: #fbf7f2;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+      border: 1px dashed rgba(121, 91, 62, 0.18);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #fffdfa;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 920px;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(121, 91, 62, 0.1);
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #fff7ef;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    tbody tr:nth-child(odd) {
+      background: rgba(249, 241, 230, 0.36);
+    }
+
+    tbody tr:hover {
+      background: rgba(246, 223, 210, 0.28);
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .name-cell {
+      min-width: 180px;
+    }
+
+    .name-main {
+      font-weight: 800;
+      line-height: 1.35;
+    }
+
+    .name-sub {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+      margin-top: 2px;
+    }
+
+    .cache-highlight {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    #operationDialog .dialog-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #operationDialogNote {
+      color: var(--danger);
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.65;
+    }
+
+    #tradeDialog .dialog-shell {
+      max-height: min(92vh, 980px);
+    }
+
+    #tradeDialog .dialog-body {
+      padding: 16px 18px 20px;
+      gap: 12px;
+    }
+
+    #tradeDialog .dialog-section {
+      padding: 14px;
+      gap: 10px;
+    }
+
+    #tradeDialog .table-wrap {
+      max-height: 74vh;
+    }
+
+    #tradeDialog table {
+      min-width: 860px;
+    }
+
+    #tradeDialog th,
+    #tradeDialog td {
+      padding: 9px 10px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    #tradeDialog .name-cell {
+      min-width: 150px;
+    }
+
+    .profit-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .profit-card {
+      background: #fffdf9;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .profit-card strong {
+      font-size: 17px;
+      line-height: 1.3;
+    }
+
+    .month-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .month-card {
+      padding: 13px 14px;
+      border-radius: 16px;
+      background: #fffdfa;
+      border: 1px solid rgba(121, 91, 62, 0.1);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .month-card span:first-child {
+      color: var(--muted);
+    }
+
     .loading-overlay,
     .auth-overlay {
       position: fixed;
@@ -230,98 +793,120 @@
       align-items: center;
       justify-content: center;
       padding: 20px;
-      backdrop-filter: blur(4px);
       transition: opacity .18s ease;
+      backdrop-filter: blur(4px);
     }
+
     .loading-overlay {
-      background: rgba(3, 8, 18, 0.62);
+      background: rgba(60, 40, 24, 0.3);
       opacity: 0;
       pointer-events: none;
       z-index: 999;
     }
-    body.loading .loading-overlay {
-      opacity: 1;
-      pointer-events: auto;
-    }
+
     .auth-overlay {
-      background: rgba(3, 8, 18, 0.72);
+      background: rgba(60, 40, 24, 0.38);
       opacity: 0;
       pointer-events: none;
       z-index: 1000;
     }
+
+    body.loading .loading-overlay,
     body.auth-locked .auth-overlay {
       opacity: 1;
       pointer-events: auto;
     }
+
     .loading-card,
     .auth-card {
-      width: min(360px, calc(100vw - 32px));
-      padding: 18px 18px 16px;
-      border-radius: 8px;
-      border: 1px solid rgba(86, 212, 255, 0.16);
-      background: rgba(16, 26, 45, 0.98);
-      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+      width: min(380px, calc(100vw - 32px));
+      padding: 22px 20px 18px;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 20px 56px rgba(70, 47, 29, 0.18);
     }
+
     .loading-card {
       text-align: center;
     }
+
     .loading-spinner {
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       margin: 0 auto 12px;
       border-radius: 50%;
-      border: 3px solid rgba(159, 176, 207, 0.18);
+      border: 3px solid rgba(121, 91, 62, 0.14);
       border-top-color: var(--accent);
       animation: spin .8s linear infinite;
     }
+
     .loading-title,
     .auth-title {
       color: var(--text);
-      font-size: 15px;
-      font-weight: 700;
+      font-size: 16px;
+      font-weight: 800;
     }
+
     .loading-subtitle,
     .auth-copy {
       color: var(--muted);
       font-size: 12px;
-      line-height: 1.6;
+      line-height: 1.7;
       margin-top: 6px;
     }
+
     .auth-form {
       display: grid;
       gap: 10px;
       margin-top: 14px;
     }
+
     .auth-error {
       min-height: 18px;
       font-size: 12px;
       color: var(--danger);
       margin-top: 8px;
     }
+
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-    @media (min-width: 720px) {
-      .shell {
-        width: min(1180px, calc(100vw - 28px));
+
+    @media (min-width: 760px) {
+      .hero {
+        grid-template-columns: minmax(0, 1.3fr) minmax(360px, .9fr);
+        align-items: end;
       }
-      .panel-header {
-        padding: 20px;
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-      .login {
+
+      .action-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .dialog-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .capital-row {
         grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
       }
-      .badges {
+
+      .profit-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
-      .grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px;
-        padding: 18px;
+
+      .month-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
-      .section.wide {
-        grid-column: 1 / -1;
+    }
+
+    @media (min-width: 1040px) {
+      .summary-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
       }
     }
   </style>
@@ -329,35 +914,257 @@
 <body class="auth-locked">
   <main class="shell">
     <section class="hero">
-      <h1>ETF 策略面板</h1>
-      <p>策略结果缓存保存在当前浏览器。口令只在当前页面内存里使用，不做本地保存。金额仅用于本地估算购买份数。</p>
-      <div class="login">
-        <input id="capitalInput" class="capital" type="text" inputmode="decimal" placeholder="当前金额，例如 20000" />
-        <button id="amountConfirmBtn" class="action-btn">确认金额</button>
+      <div class="hero-copy">
+        <div class="hero-kicker">ETF Rotation Console</div>
+        <h1>ETF 策略面板</h1>
+        <p id="heroSummary">最新交易日: -&nbsp;&nbsp;结果来源: - | <span class="cache-highlight">最后缓存时间: -</span></p>
       </div>
-      <div class="toolbar">
-        <button id="btnV7" class="active">V7</button>
-        <button id="btnV8">V8</button>
-        <button id="btnRefresh" class="warn">获取最新数据</button>
-      </div>
-      <div class="status" id="status">请先获取策略结果</div>
-      <div class="sizing-card">
-        <div class="sizing-title">信号购买数量</div>
-        <div class="sizing-list" id="sizingList">
-          <div class="sizing-empty">请先获取策略结果。</div>
+      <div class="hero-copy">
+        <div class="toolbar">
+          <button id="btnV7" class="active" type="button">V7</button>
+          <button id="btnV8" type="button">V8</button>
+          <button id="btnRefresh" class="warn" type="button">获取最新数据</button>
         </div>
+        <div class="status" id="status">请输入口令后读取前端缓存</div>
       </div>
     </section>
 
     <section class="panel">
-      <div class="panel-header">
-        <div class="eyebrow" id="panelEyebrow">未加载</div>
-        <h2 id="panelTitle">策略结果</h2>
-        <div class="badges" id="badges"></div>
+      <div class="panel-head">
+        <div>
+          <h2>数据入口</h2>
+          <p id="panelNote">点击按钮查看对应对话框。</p>
+        </div>
       </div>
-      <div class="grid" id="grid"></div>
+      <div class="action-grid">
+        <article class="action-tile">
+          <button id="openOperationBtn" class="tile-btn" type="button">
+            <div class="tile-top">
+              <div>
+                <div class="tile-title">最新操作</div>
+                <div class="tile-copy">金额输入、确认金额、信号购买数量、买入计划、卖出计划、当前持仓都放到这里。</div>
+              </div>
+              <div class="tile-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M7 6h10"></path>
+                  <path d="M7 12h10"></path>
+                  <path d="M7 18h6"></path>
+                  <path d="M5 6h.01"></path>
+                  <path d="M5 12h.01"></path>
+                  <path d="M5 18h.01"></path>
+                </svg>
+              </div>
+            </div>
+            <div class="tile-meta" id="tileOperationMeta">
+              <span class="meta-pill">暂无数据</span>
+            </div>
+          </button>
+        </article>
+
+        <article class="action-tile">
+          <button id="openRankingBtn" class="tile-btn" type="button">
+            <div class="tile-top">
+              <div>
+                <div class="tile-title">最新排名</div>
+                <div class="tile-copy">查看最新交易日 score 排行，只保留 10chg、50chg、last1chg，并显示买入条件、过滤条件和最终通过结果。</div>
+              </div>
+              <div class="tile-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 18V10"></path>
+                  <path d="M12 18V6"></path>
+                  <path d="M19 18v-4"></path>
+                </svg>
+              </div>
+            </div>
+            <div class="tile-meta" id="tileRankingMeta">
+              <span class="meta-pill">暂无数据</span>
+            </div>
+          </button>
+        </article>
+
+        <article class="action-tile">
+          <button id="openTradeBtn" class="tile-btn" type="button">
+            <div class="tile-top">
+              <div>
+                <div class="tile-title">最近交易</div>
+                <div class="tile-copy">查看最近命中到结算的交易详情，重点展示买卖条件、日期、价格、收益和账户收益。</div>
+              </div>
+              <div class="tile-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 7h12"></path>
+                  <path d="m12 3 4 4-4 4"></path>
+                  <path d="M20 17H8"></path>
+                  <path d="m12 13-4 4 4 4"></path>
+                </svg>
+              </div>
+            </div>
+            <div class="tile-meta" id="tileTradeMeta">
+              <span class="meta-pill">暂无数据</span>
+            </div>
+          </button>
+        </article>
+
+        <article class="action-tile">
+          <button id="openProfitBtn" class="tile-btn" type="button">
+            <div class="tile-top">
+              <div>
+                <div class="tile-title">最近收益</div>
+                <div class="tile-copy">查看近交易日统计、最新一卖出账户收益和年度收益分布。</div>
+              </div>
+              <div class="tile-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 18h16"></path>
+                  <path d="M6 15.5 10 11l3 3 5-6"></path>
+                  <path d="m18 8 1-3 3 1"></path>
+                </svg>
+              </div>
+            </div>
+            <div class="tile-meta" id="tileProfitMeta">
+              <span class="meta-pill">暂无数据</span>
+            </div>
+          </button>
+        </article>
+      </div>
     </section>
   </main>
+
+  <dialog id="operationDialog">
+    <div class="dialog-shell">
+      <div class="dialog-head">
+        <div>
+          <h3>今日操作 / 最新操作</h3>
+          <p id="operationDialogNote">金额试算、信号购买数量、买入计划、卖出计划、当前持仓。</p>
+        </div>
+        <button class="dialog-close" data-close-dialog="operationDialog" type="button">×</button>
+      </div>
+      <div class="dialog-body">
+        <section class="dialog-section wide">
+          <h4>金额试算</h4>
+          <p class="section-note">输入当前金额后，按最新买入计划估算每个信号的购买数量。</p>
+          <div class="capital-row">
+            <input id="capitalInput" class="capital" type="text" inputmode="decimal" placeholder="当前金额，例如 20000" />
+            <button id="amountConfirmBtn" class="dialog-btn" type="button">确认金额</button>
+          </div>
+          <div id="sizingList" class="card-list"></div>
+        </section>
+
+        <div class="dialog-grid">
+          <section class="dialog-section wide">
+            <h4>买入计划</h4>
+            <div id="buyPlanList" class="card-list"></div>
+          </section>
+
+          <section class="dialog-section wide">
+            <h4>卖出计划</h4>
+            <div id="sellPlanList" class="card-list"></div>
+          </section>
+
+          <section class="dialog-section wide">
+            <h4>当前持仓</h4>
+            <div id="holdList" class="card-list"></div>
+          </section>
+        </div>
+      </div>
+      <div id="operationTooltip" class="floating-tooltip" role="tooltip" hidden></div>
+    </div>
+  </dialog>
+
+  <dialog id="rankingDialog">
+    <div class="dialog-shell">
+      <div class="dialog-head">
+        <div>
+          <h3>最新交易日排行</h3>
+          <p id="rankingDialogNote">score 排行只保留 10chg、50chg、last1chg，并根据最新文本结果显示买入条件、过滤条件和通过状态。</p>
+        </div>
+        <button class="dialog-close" data-close-dialog="rankingDialog" type="button">×</button>
+      </div>
+      <div class="dialog-body">
+        <section class="dialog-section wide">
+          <h4>最新排名</h4>
+          <p class="section-note" id="rankingHint">无</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>排名</th>
+                  <th>ETF</th>
+                  <th>Score</th>
+                  <th>10chg</th>
+                  <th>50chg</th>
+                  <th>last1chg</th>
+                  <th>买入条件</th>
+                  <th>过滤</th>
+                  <th>结果</th>
+                </tr>
+              </thead>
+              <tbody id="rankingTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <div id="rankingTooltip" class="floating-tooltip" role="tooltip" hidden></div>
+    </div>
+  </dialog>
+
+  <dialog id="tradeDialog">
+    <div class="dialog-shell">
+      <div class="dialog-head">
+        <div>
+          <h3>最近交易详情</h3>
+          <p id="tradeDialogNote">展示最近命中到结算的详情，不显示分数和排名，重点看条件、价格、收益和账户收益。</p>
+        </div>
+        <button class="dialog-close" data-close-dialog="tradeDialog" type="button">×</button>
+      </div>
+      <div class="dialog-body">
+        <section class="dialog-section wide">
+          <h4>最近交易</h4>
+          <p class="section-note" id="tradeHint">无</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ETF</th>
+                  <th>买入条件</th>
+                  <th>卖出条件</th>
+                  <th>买入日期</th>
+                  <th>买入价格</th>
+                  <th>卖出日期</th>
+                  <th>卖出价格</th>
+                  <th>收益</th>
+                  <th>账户收益</th>
+                </tr>
+              </thead>
+              <tbody id="tradeTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <div id="tradeTooltip" class="floating-tooltip" role="tooltip" hidden></div>
+    </div>
+  </dialog>
+
+  <dialog id="profitDialog">
+    <div class="dialog-shell">
+      <div class="dialog-head">
+        <div>
+          <h3>最近收益</h3>
+          <p id="profitDialogNote">近交易日统计、最新一卖出账户收益、年度收益。</p>
+        </div>
+        <button class="dialog-close" data-close-dialog="profitDialog" type="button">×</button>
+      </div>
+      <div class="dialog-body">
+        <div class="profit-grid" id="profitCards"></div>
+        <section class="dialog-section wide">
+          <h4>年度收益</h4>
+          <p class="section-note" id="yearlyTitle">无</p>
+          <div class="month-grid" id="yearlyGrid"></div>
+        </section>
+      </div>
+      <div id="profitTooltip" class="floating-tooltip" role="tooltip" hidden></div>
+    </div>
+  </dialog>
+
+  <div id="conditionTooltip" class="floating-tooltip" role="tooltip" hidden></div>
 
   <div class="loading-overlay" id="loadingOverlay" aria-hidden="true">
     <div class="loading-card" role="status" aria-live="polite">
@@ -370,10 +1177,10 @@
   <div class="auth-overlay" id="authOverlay" aria-hidden="false">
     <div class="auth-card">
       <div class="auth-title">输入访问口令</div>
-      <div class="auth-copy">输入口令后才能操作页面。</div>
+      <div class="auth-copy">输入口令后才能读取缓存或刷新数据。口令只保存在当前页面内存里，不做本地保存。</div>
       <div class="auth-form">
         <input id="passwordModalInput" class="password-modal-input" type="password" inputmode="numeric" placeholder="输入访问口令" />
-        <button id="passwordSubmitBtn" class="modal-btn">进入页面</button>
+        <button id="passwordSubmitBtn" class="modal-btn" type="button">进入页面</button>
       </div>
       <div class="auth-error" id="authError"></div>
     </div>
@@ -382,18 +1189,50 @@
   <script>
     const DEFAULT_BASE_URL = "https://1258557411-28azoctxlh.ap-guangzhou.tencentscf.com";
     const baseUrl = DEFAULT_BASE_URL.replace(/\/+$/, "");
+    const pageParams = new URLSearchParams(window.location.search);
 
-    const capitalInput = document.getElementById("capitalInput");
-    const amountConfirmBtn = document.getElementById("amountConfirmBtn");
     const statusEl = document.getElementById("status");
-    const panelEyebrow = document.getElementById("panelEyebrow");
-    const panelTitle = document.getElementById("panelTitle");
-    const badgesEl = document.getElementById("badges");
-    const gridEl = document.getElementById("grid");
-    const sizingListEl = document.getElementById("sizingList");
     const btnV7 = document.getElementById("btnV7");
     const btnV8 = document.getElementById("btnV8");
     const btnRefresh = document.getElementById("btnRefresh");
+    const heroSummaryEl = document.getElementById("heroSummary");
+    const panelNoteEl = document.getElementById("panelNote");
+    const tileOperationMetaEl = document.getElementById("tileOperationMeta");
+    const tileRankingMetaEl = document.getElementById("tileRankingMeta");
+    const tileTradeMetaEl = document.getElementById("tileTradeMeta");
+    const tileProfitMetaEl = document.getElementById("tileProfitMeta");
+
+    const openOperationBtn = document.getElementById("openOperationBtn");
+    const openRankingBtn = document.getElementById("openRankingBtn");
+    const openTradeBtn = document.getElementById("openTradeBtn");
+    const openProfitBtn = document.getElementById("openProfitBtn");
+
+    const operationDialog = document.getElementById("operationDialog");
+    const rankingDialog = document.getElementById("rankingDialog");
+    const tradeDialog = document.getElementById("tradeDialog");
+    const profitDialog = document.getElementById("profitDialog");
+
+    const operationDialogNoteEl = document.getElementById("operationDialogNote");
+    const capitalInput = document.getElementById("capitalInput");
+    const amountConfirmBtn = document.getElementById("amountConfirmBtn");
+    const sizingListEl = document.getElementById("sizingList");
+    const buyPlanListEl = document.getElementById("buyPlanList");
+    const holdListEl = document.getElementById("holdList");
+    const sellPlanListEl = document.getElementById("sellPlanList");
+
+    const rankingDialogNoteEl = document.getElementById("rankingDialogNote");
+    const rankingHintEl = document.getElementById("rankingHint");
+    const rankingTableBodyEl = document.getElementById("rankingTableBody");
+
+    const tradeDialogNoteEl = document.getElementById("tradeDialogNote");
+    const tradeHintEl = document.getElementById("tradeHint");
+    const tradeTableBodyEl = document.getElementById("tradeTableBody");
+
+    const profitDialogNoteEl = document.getElementById("profitDialogNote");
+    const profitCardsEl = document.getElementById("profitCards");
+    const yearlyTitleEl = document.getElementById("yearlyTitle");
+    const yearlyGridEl = document.getElementById("yearlyGrid");
+
     const loadingOverlay = document.getElementById("loadingOverlay");
     const loadingTitle = document.getElementById("loadingTitle");
     const loadingSubtitle = document.getElementById("loadingSubtitle");
@@ -401,30 +1240,13 @@
     const passwordModalInput = document.getElementById("passwordModalInput");
     const passwordSubmitBtn = document.getElementById("passwordSubmitBtn");
     const authErrorEl = document.getElementById("authError");
+    const pageTooltipEl = document.getElementById("conditionTooltip");
 
     const AMOUNT_STORAGE_KEY = "etf_strategy_amount_v1";
-    const STRATEGY_BUNDLE_STORAGE_KEY = "etf_strategy_bundle_v2";
-
-    let currentStrategy = "v7";
-    let currentPassword = "";
-    let currentPayload = null;
-    let strategyPayloadMap = { v7: null, v8: null };
-    let currentSplitMap = {};
-
-    const SECTION_ORDER = [
-      "卖出计划",
-      "当前待结算持仓",
-      "买入计划",
-      "页面结果",
-      "最新交易日score排行",
-      "新增信号详情",
-      "买入条件",
-      "过滤条件",
-      "卖出条件",
-      "最近命中明细",
-      "最近卖出明细",
-      "年度 / 月度收益"
-    ];
+    const STRATEGY_BUNDLE_STORAGE_KEY = "etf_strategy_bundle_v3";
+    const DEMO_BUNDLE_URL = pageParams.get("demoBundle") || (pageParams.get("demo") === "1" ? "./demo/etf_strategy_bundle_latest.json" : "");
+    const DEMO_MODE = Boolean(DEMO_BUNDLE_URL);
+    const DEMO_AMOUNT = pageParams.get("amount") || "20000";
 
     const HEADING_MAP = {
       "卖出计划:": "卖出计划",
@@ -434,86 +1256,51 @@
       "最新V8买入计划:": "买入计划",
       "最新交易日score排行:": "最新交易日score排行",
       "新增信号详情:": "新增信号详情",
+      "新增信号详细:": "新增信号详情",
       "买入条件:": "买入条件",
       "过滤条件:": "过滤条件",
       "卖出条件:": "卖出条件",
       "最近命中明细:": "最近命中明细",
       "最近交易/挂单明细:": "最近命中明细",
+      "最近命中/挂单明细:": "最近命中明细",
       "命中/挂单未成交:": "最近命中明细",
       "最近卖出明细:": "最近卖出明细",
       "卖出:": "最近卖出明细"
     };
 
-    function isPayloadStructurallyValid(strategy, payload) {
-      if (!payload || typeof payload.text !== "string") return false;
-      const text = payload.text;
-      if (!text.includes("最新交易日score排行")) return false;
-      if (!text.includes("卖出计划")) return false;
-      if (strategy === "v7" && !text.includes("最新V7挂单计划")) return false;
-      if (strategy === "v8" && !text.includes("最新V8买入计划")) return false;
+    const SECTION_NAMES = [
+      "最近命中明细",
+      "最近卖出明细",
+      "最新交易日score排行",
+      "买入条件",
+      "过滤条件",
+      "卖出条件",
+      "新增信号详情",
+      "买入计划",
+      "当前待结算持仓",
+      "卖出计划"
+    ];
 
-      const lines = splitLines(text);
-      const summaryInfo = extractSummary(lines, payload);
-      const sections = parseSections(lines, summaryInfo);
-      const rankCount = (sections["最新交易日score排行"] || []).length;
-      return rankCount >= 20;
+    let currentStrategy = "v7";
+    let currentPassword = "";
+    let currentPayload = null;
+    let currentParsed = null;
+    let strategyPayloadMap = { v7: null, v8: null };
+    let activeTooltipTrigger = null;
+    let activeTooltipPinned = false;
+    let activeTooltipEl = pageTooltipEl;
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
     }
 
-    function clearStrategyPayloads() {
-      strategyPayloadMap = { v7: null, v8: null };
-    }
-
-    function currentStrategyPayload() {
-      return strategyPayloadMap[currentStrategy] || null;
-    }
-
-    function normalizeStrategyResults(payload) {
-      const results = payload && typeof payload.results === "object" ? payload.results : {};
-      const nextMap = { v7: null, v8: null };
-
-      for (const strategy of ["v7", "v8"]) {
-        const result = results[strategy];
-        if (!isPayloadStructurallyValid(strategy, result)) {
-          throw new Error(`${strategy.toUpperCase()} 返回的数据不完整`);
-        }
-        nextMap[strategy] = { ...result };
-      }
-
-      return nextMap;
-    }
-
-    function saveStrategyBundleCache(payload) {
-      const normalized = normalizeStrategyResults(payload);
-      localStorage.setItem(
-        STRATEGY_BUNDLE_STORAGE_KEY,
-        JSON.stringify({
-          cached_at: payload && payload.cached_at ? payload.cached_at : "",
-          results: normalized
-        })
-      );
-      strategyPayloadMap = {
-        v7: { ...normalized.v7, front_cached: false },
-        v8: { ...normalized.v8, front_cached: false }
-      };
-      return strategyPayloadMap;
-    }
-
-    function loadStrategyBundleCache() {
-      try {
-        const raw = localStorage.getItem(STRATEGY_BUNDLE_STORAGE_KEY);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        const normalized = normalizeStrategyResults(parsed);
-        strategyPayloadMap = {
-          v7: { ...normalized.v7, front_cached: true },
-          v8: { ...normalized.v8, front_cached: true }
-        };
-        return strategyPayloadMap;
-      } catch {
-        localStorage.removeItem(STRATEGY_BUNDLE_STORAGE_KEY);
-        clearStrategyPayloads();
-        return null;
-      }
+    function splitLines(text) {
+      return String(text || "").split(/\r?\n/).map(line => line.trimEnd());
     }
 
     function setStatus(message, isError = false) {
@@ -542,24 +1329,97 @@
       btnV8.classList.toggle("active", currentStrategy === "v8");
     }
 
-    function escapeHtml(value) {
-      return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/\"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+    function safeStorageGet(key) {
+      try {
+        return localStorage.getItem(key);
+      } catch {
+        return null;
+      }
     }
 
-    function splitLines(text) {
-      return String(text || "").split(/\r?\n/).map(line => line.trimEnd());
+    function safeStorageSet(key, value) {
+      try {
+        localStorage.setItem(key, value);
+      } catch {
+        // Ignore storage failures in preview-only environments.
+      }
+    }
+
+    function safeStorageRemove(key) {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // Ignore storage failures in preview-only environments.
+      }
     }
 
     function resultSource(payload) {
       if (!payload) return "-";
+      if (payload.demo_sample) return "本地示例";
       if (payload.front_cached) return "前端缓存";
       if (payload.refreshed) return "最新数据";
       return "策略结果";
+    }
+
+    function resolveTooltipElement(trigger) {
+      if (!trigger) return pageTooltipEl;
+      return trigger.closest("dialog")?.querySelector(".floating-tooltip") || pageTooltipEl;
+    }
+
+    function closestTooltipTrigger(target) {
+      return target instanceof Element ? target.closest(".tooltip-trigger") : null;
+    }
+
+    function positionTooltip(trigger) {
+      if (!trigger || !activeTooltipEl || activeTooltipEl.hidden) return;
+      const rect = trigger.getBoundingClientRect();
+      const gap = 12;
+      const maxWidth = Math.min(340, window.innerWidth - 24);
+      activeTooltipEl.style.maxWidth = `${maxWidth}px`;
+      const tipRect = activeTooltipEl.getBoundingClientRect();
+      let top = rect.top - tipRect.height - gap;
+      if (top < 12) {
+        top = rect.bottom + gap;
+      }
+      let left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+      left = Math.max(12, Math.min(left, window.innerWidth - tipRect.width - 12));
+      activeTooltipEl.style.top = `${top}px`;
+      activeTooltipEl.style.left = `${left}px`;
+    }
+
+    function hideTooltip(force = false) {
+      if (activeTooltipPinned && !force) return;
+      if (activeTooltipTrigger) {
+        activeTooltipTrigger.setAttribute("aria-expanded", "false");
+      }
+      activeTooltipTrigger = null;
+      activeTooltipPinned = false;
+      if (activeTooltipEl) {
+        activeTooltipEl.hidden = true;
+        activeTooltipEl.textContent = "";
+      }
+      activeTooltipEl = pageTooltipEl;
+    }
+
+    function showTooltip(trigger, options = {}) {
+      if (!trigger || activeTooltipPinned && activeTooltipTrigger !== trigger && !options.pinned) return;
+      const text = trigger.getAttribute("data-tooltip");
+      if (!text) return;
+      const nextTooltipEl = resolveTooltipElement(trigger);
+      if (activeTooltipTrigger && activeTooltipTrigger !== trigger) {
+        activeTooltipTrigger.setAttribute("aria-expanded", "false");
+      }
+      if (activeTooltipEl && activeTooltipEl !== nextTooltipEl) {
+        activeTooltipEl.hidden = true;
+        activeTooltipEl.textContent = "";
+      }
+      activeTooltipEl = nextTooltipEl;
+      activeTooltipTrigger = trigger;
+      activeTooltipPinned = Boolean(options.pinned);
+      activeTooltipTrigger.setAttribute("aria-expanded", "true");
+      activeTooltipEl.textContent = text;
+      activeTooltipEl.hidden = false;
+      positionTooltip(trigger);
     }
 
     function isHeading(line) {
@@ -568,6 +1428,75 @@
 
     function normalizeHeading(line) {
       return HEADING_MAP[line.trim()] || "";
+    }
+
+    function isPayloadStructurallyValid(strategy, payload) {
+      if (!payload || typeof payload.text !== "string") return false;
+      const text = payload.text;
+      if (!text.includes("最新交易日score排行")) return false;
+      if (!text.includes("卖出计划")) return false;
+      if (strategy === "v7" && !text.includes("最新V7挂单计划")) return false;
+      if (strategy === "v8" && !text.includes("最新V8买入计划")) return false;
+
+      const lines = splitLines(text);
+      const summaryInfo = extractSummary(lines, payload);
+      const sections = parseSections(lines, summaryInfo);
+      return (sections["最新交易日score排行"] || []).length >= 20;
+    }
+
+    function normalizeStrategyResults(payload) {
+      const results = payload && typeof payload.results === "object" ? payload.results : {};
+      const nextMap = { v7: null, v8: null };
+      for (const strategy of ["v7", "v8"]) {
+        const result = results[strategy];
+        if (!isPayloadStructurallyValid(strategy, result)) {
+          throw new Error(`${strategy.toUpperCase()} 返回的数据不完整`);
+        }
+        nextMap[strategy] = { ...result };
+      }
+      return nextMap;
+    }
+
+    function saveStrategyBundleCache(payload) {
+      const normalized = normalizeStrategyResults(payload);
+      safeStorageSet(
+        STRATEGY_BUNDLE_STORAGE_KEY,
+        JSON.stringify({
+          cached_at: payload && payload.cached_at ? payload.cached_at : "",
+          results: normalized
+        })
+      );
+      strategyPayloadMap = {
+        v7: { ...normalized.v7, front_cached: false },
+        v8: { ...normalized.v8, front_cached: false }
+      };
+      return strategyPayloadMap;
+    }
+
+    function loadStrategyBundleCache() {
+      try {
+        const raw = safeStorageGet(STRATEGY_BUNDLE_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const normalized = normalizeStrategyResults(parsed);
+        strategyPayloadMap = {
+          v7: { ...normalized.v7, front_cached: true },
+          v8: { ...normalized.v8, front_cached: true }
+        };
+        return strategyPayloadMap;
+      } catch {
+        safeStorageRemove(STRATEGY_BUNDLE_STORAGE_KEY);
+        strategyPayloadMap = { v7: null, v8: null };
+        return null;
+      }
+    }
+
+    function currentStrategyPayload() {
+      return strategyPayloadMap[currentStrategy] || null;
+    }
+
+    function clearStrategyPayloads() {
+      strategyPayloadMap = { v7: null, v8: null };
     }
 
     function extractSummary(lines, payload) {
@@ -592,8 +1521,10 @@
         }
         if (
           !summary.latestAccount &&
-          line.includes("卖出账户收益") &&
-          line.includes("复利倍数")
+          (
+            line.includes("最新一卖出账户收益")
+            || line.includes("最新一次卖出账户收益")
+          )
         ) {
           summary.latestAccount = line;
           continue;
@@ -611,22 +1542,23 @@
         }
       }
 
-      const resultLines = [
-        summary.latestTrade || "最新交易日: -",
-        `最后缓存时间: ${payload.cached_at || "-"}`,
-        `结果来源: ${resultSource(payload)}`
-      ];
-      if (summary.stats) resultLines.push(summary.stats);
-      if (summary.latestAccount) resultLines.push(summary.latestAccount);
-      if (summary.yearlyTitle) resultLines.push(summary.yearlyTitle);
-      if (summary.yearlyLines.length) resultLines.push(...summary.yearlyLines);
-
-      return { summary, resultLines };
+      return {
+        summary,
+        resultLines: [
+          summary.latestTrade || "最新交易日: -",
+          `最后缓存时间: ${payload.cached_at || "-"}`,
+          `结果来源: ${resultSource(payload)}`,
+          ...(summary.stats ? [summary.stats] : []),
+          ...(summary.latestAccount ? [summary.latestAccount] : []),
+          ...(summary.yearlyTitle ? [summary.yearlyTitle] : []),
+          ...summary.yearlyLines
+        ]
+      };
     }
 
     function parseSections(lines, summaryInfo) {
       const sections = {};
-      SECTION_ORDER.forEach(name => {
+      SECTION_NAMES.forEach(name => {
         sections[name] = [];
       });
 
@@ -653,33 +1585,7 @@
         sections[current.name] = body;
       }
 
-      sections["页面结果"] = summaryInfo.resultLines;
       return sections;
-    }
-
-    function renderSections(sections) {
-      const wideSections = new Set([
-        "页面结果",
-        "最新交易日score排行",
-        "新增信号详情",
-        "最近命中明细",
-        "最近卖出明细"
-      ]);
-
-      const blocks = SECTION_ORDER.map(name => {
-        const lines = sections[name] || [];
-        const body = lines.length
-          ? lines.map(line => `<div class="line">${escapeHtml(line)}</div>`).join("")
-          : `<div class="empty">暂无</div>`;
-        return `
-          <section class="section${wideSections.has(name) ? " wide" : ""}">
-            <h3>${escapeHtml(name)}</h3>
-            ${body}
-          </section>
-        `;
-      });
-
-      gridEl.innerHTML = blocks.join("");
     }
 
     function parseLooseNumber(value) {
@@ -693,8 +1599,107 @@
       return Math.max(0, Math.round(value / 100) * 100);
     }
 
+    function formatNumber(value, digits = 4) {
+      if (!Number.isFinite(value)) return "-";
+      return Number(value).toFixed(digits).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1");
+    }
+
     function formatShares(value) {
-      return value.toLocaleString("zh-CN");
+      return Number(value || 0).toLocaleString("zh-CN");
+    }
+
+    function extractHeadlineValue(line) {
+      const index = String(line || "").indexOf(":");
+      return index >= 0 ? String(line).slice(index + 1).trim() : String(line || "-").trim() || "-";
+    }
+
+    function countMeaningfulLines(lines, options = {}) {
+      return filterMeaningfulLines(lines, options).length;
+    }
+
+    function filterMeaningfulLines(lines, options = {}) {
+      const skipPrefix = options.skipPrefix || "";
+      return (lines || []).filter(line => {
+        if (!line || line === "无") return false;
+        if (skipPrefix && line.startsWith(skipPrefix)) return false;
+        return true;
+      });
+    }
+
+    function formatCountLabel(count) {
+      return count > 0 ? `${count}份` : "无";
+    }
+
+    function extractStatsLineFromPayload(payload) {
+      if (!payload || typeof payload.text !== "string") return "";
+      return splitLines(payload.text).find(line => /^近\d+个交易日统计:/.test(line.trim())) || "";
+    }
+
+    function resolveStatsDisplay(summaryStats) {
+      const currentStats = String(summaryStats || "").trim();
+      if (/^近450个交易日统计:/.test(currentStats)) {
+        return { primary: currentStats, secondary: "" };
+      }
+
+      for (const strategy of ["v7", "v8"]) {
+        const candidate = extractStatsLineFromPayload(strategyPayloadMap[strategy]);
+        if (/^近450个交易日统计:/.test(candidate)) {
+          return {
+            primary: candidate,
+            secondary: candidate === currentStats ? "" : currentStats
+          };
+        }
+      }
+
+      return {
+        primary: currentStats || "近交易日统计: -",
+        secondary: ""
+      };
+    }
+
+    function renderTooltipChip(label, reason, className = "flag-chip") {
+      if (!reason) {
+        return `<span class="${className}">${escapeHtml(label)}</span>`;
+      }
+      return `<button class="${className} tooltip-trigger" type="button" data-tooltip="${escapeHtml(reason)}" title="${escapeHtml(reason)}" aria-label="${escapeHtml(`${label}: ${reason}`)}">${escapeHtml(label)}</button>`;
+    }
+
+    function parsePercentValue(line) {
+      const matched = String(line || "").match(/([-+]?\d+(?:\.\d+)?)%/);
+      return matched ? Number(matched[1]) : NaN;
+    }
+
+    function parseLatestAccountInfo(line) {
+      const matched = String(line || "").match(/([-+]?\d+(?:\.\d+)?)%.*?实际卖出日期[:：]?(\d{4}-\d{2}-\d{2})/);
+      if (!matched) {
+        return { value: NaN, date: "" };
+      }
+      return { value: Number(matched[1]), date: matched[2] };
+    }
+
+    function parseRuleMap(lines) {
+      const map = {};
+      (lines || []).forEach(line => {
+        const matched = String(line).match(/^(\d+)\.\s*(.+)$/);
+        if (matched) {
+          map[matched[1]] = matched[2];
+        }
+      });
+      return map;
+    }
+
+    function parseMonthLines(lines) {
+      const rows = [];
+      (lines || []).forEach(line => {
+        String(line).split("|").forEach(part => {
+          const trimmed = part.trim();
+          const matched = trimmed.match(/^(\d{4}-\d{2}):\s*([-+]?\d+(?:\.\d+)?)%$/);
+          if (matched) {
+            rows.push({ month: matched[1], value: Number(matched[2]) });
+          }
+        });
+      });
+      return rows;
     }
 
     function extractRankCloseMap(sections) {
@@ -709,27 +1714,24 @@
       return map;
     }
 
-    function extractBuyPlanEntries(lines, sections) {
+    function extractBuyPlanEntries(sections) {
       const closeMap = extractRankCloseMap(sections);
       const entries = new Map();
       const buyLines = sections["买入计划"] || [];
 
       for (const line of buyLines) {
+        if (line === "无") continue;
+        if (line.startsWith("卖出前持仓数:")) continue;
         const baseMatch = line.match(/^(.+?)\((S[HZ]\d+)\)/);
         if (!baseMatch) continue;
-        if (line.startsWith("卖出前持仓数:")) continue;
 
         const name = baseMatch[1];
         const code = baseMatch[2];
         const signalCloseMatch = line.match(/信号日收盘:([0-9.]+)/);
-        const buyPriceMatch = line.match(/买入价:([0-9.]+)/);
-        const orderPriceMatch = line.match(/挂单价:([0-9.]+)/);
-        const pendingOrderMatch = line.match(/计划下一交易日挂单\s*([0-9.]+)/);
-
+        const orderPriceMatch = line.match(/(?:挂单价:|计划下一交易日挂单\s*)([0-9.]+)/);
         const signalClose = signalCloseMatch
           ? Number(signalCloseMatch[1])
-          : closeMap.get(code)
-            ?? (buyPriceMatch ? Number(buyPriceMatch[1]) : (orderPriceMatch ? Number(orderPriceMatch[1]) : (pendingOrderMatch ? Number(pendingOrderMatch[1]) : NaN)));
+          : closeMap.get(code) ?? NaN;
 
         if (!Number.isFinite(signalClose) || signalClose <= 0) continue;
 
@@ -737,129 +1739,597 @@
           name,
           code,
           signalClose,
-          orderPrice: orderPriceMatch ? Number(orderPriceMatch[1]) : (pendingOrderMatch ? Number(pendingOrderMatch[1]) : null),
+          orderPrice: orderPriceMatch ? Number(orderPriceMatch[1]) : null
         });
       }
 
       return Array.from(entries.values());
     }
 
-    function formatSplitInfo(item) {
-      if (!item || !item.has_recent_split) {
-        return "近期无拆分";
+    function parseDisplayLine(line) {
+      const text = String(line || "").trim();
+      if (!text || text === "无") return null;
+
+      const etfMatch = text.match(/^(.+?)\((S[HZ]\d+)\)(.*)$/);
+      if (!etfMatch) {
+        return {
+          title: text,
+          segments: []
+        };
       }
-      const ratio = Number.isFinite(Number(item.split_ratio)) ? Number(item.split_ratio) : null;
-      const ratioText = ratio === null ? "-" : ratio.toString();
-      return `近期拆分: ${item.split_date || "-"} ${item.split_type || ""} ${ratioText}`.trim();
+
+      const [, name, code, rawTail] = etfMatch;
+      const tail = rawTail.trim().replace(/^\|\s*/, "");
+      const segments = tail
+        .split(/\s+\|\s+|；/g)
+        .map(item => item.trim().replace(/[。]+$/, ""))
+        .filter(Boolean);
+
+      return {
+        title: `${name} (${code})`,
+        segments
+      };
     }
 
-    async function loadFundSplitMap(entries) {
-      const codes = Array.from(new Set((entries || []).map(item => item.code).filter(Boolean)));
-      if (!codes.length || !currentPassword.trim()) {
-        currentSplitMap = {};
-        return currentSplitMap;
-      }
-      try {
-        const payload = await fetchJson(buildApiUrl("/api/fund/splits", { codes: codes.join(",") }));
-        currentSplitMap = payload.items || {};
-      } catch {
-        currentSplitMap = {};
-      }
-      return currentSplitMap;
+    function renderEmptyState(message) {
+      return `<div class="empty">${escapeHtml(message)}</div>`;
     }
 
-    function renderSizingFromPayload(payload, splitMap = currentSplitMap) {
-      if (!payload || !payload.text) {
-        sizingListEl.innerHTML = '<div class="sizing-empty">请先获取策略结果。</div>';
+    function renderRecordCards(lines, emptyText = "暂无数据") {
+      const cleaned = (lines || []).filter(line => line && line !== "无");
+      if (!cleaned.length) {
+        return renderEmptyState(emptyText);
+      }
+
+      return cleaned.map(line => {
+        const parsed = parseDisplayLine(line);
+        if (!parsed) return "";
+        const chips = parsed.segments.length
+          ? `<div class="chip-row">${parsed.segments.map(segment => `<span class="chip">${escapeHtml(segment)}</span>`).join("")}</div>`
+          : "";
+        return `
+          <article class="record-card">
+            <div class="record-title">${escapeHtml(parsed.title)}</div>
+            ${chips || `<div class="record-copy">${escapeHtml(line)}</div>`}
+          </article>
+        `;
+      }).join("");
+    }
+
+    function parseV7SignalDetailMap(lines, buyRuleMap, filterRuleMap) {
+      const map = new Map();
+      for (const line of lines || []) {
+        const matched = line.match(/^(\d+)\.(.+?)\((S[HZ]\d+)\)\s+score:([-\d.]+)\s+percent:([-\d.]+)\s+\|\s+基础:([YN])\s+排名:([YN])\s+分数:([YN])\s+红K:([YN])\s+入选:([YN])\s+\|\s+排名过滤:([YN])\s+last4过滤:([YN])\s+过热过滤:([YN])\s+90放行:([YN])\s+弱势过滤:([YN])\s+chg50过滤:([YN])\s+\|\s+(通过|不通过)$/);
+        if (!matched) continue;
+
+        const code = matched[3];
+        const conditions = [];
+        if (matched[6] === "Y") conditions.push({ label: "条件1", reason: buyRuleMap["1"] || "基础候选池" });
+        if (matched[7] === "Y") conditions.push({ label: "条件2", reason: buyRuleMap["2"] || "score 排名" });
+        if (matched[8] === "Y") conditions.push({ label: "条件3", reason: buyRuleMap["3"] || "分数条件" });
+        if (matched[9] === "Y") conditions.push({ label: "条件4", reason: buyRuleMap["4"] || "红K 竞争信号" });
+
+        const filters = [];
+        if (matched[11] === "Y") filters.push({ label: "过滤1", reason: filterRuleMap["1"] || "排名过滤" });
+        if (matched[12] === "Y") filters.push({ label: "过滤2", reason: filterRuleMap["2"] || "last4 过滤" });
+        if (matched[13] === "Y" && matched[14] !== "Y") filters.push({ label: "过滤3", reason: filterRuleMap["3"] || "过热过滤" });
+        if (matched[15] === "Y") filters.push({ label: "过滤4", reason: filterRuleMap["4"] || "弱势过滤" });
+        if (matched[16] === "Y") filters.push({ label: "过滤5", reason: filterRuleMap["5"] || "chg50 过滤" });
+
+        map.set(code, {
+          percent: Number(matched[5]),
+          conditions,
+          filters,
+          pass: matched[17] === "通过"
+        });
+      }
+      return map;
+    }
+
+    function parseRankRows(strategy, sections) {
+      const rankLines = sections["最新交易日score排行"] || [];
+      const buyRuleMap = parseRuleMap(sections["买入条件"] || []);
+      const filterRuleMap = parseRuleMap(sections["过滤条件"] || []);
+      const detailMap = strategy === "v7"
+        ? parseV7SignalDetailMap(sections["新增信号详情"] || [], buyRuleMap, filterRuleMap)
+        : new Map();
+
+      const v8BaseReason = buyRuleMap["1"] || "timechg60 >= -0.06";
+      const v8ConditionReasonMap = {
+        "1": buyRuleMap["2"] || "step1",
+        "2": buyRuleMap["3"] || "step2",
+        "3": buyRuleMap["4"] || "step3",
+        "4": buyRuleMap["5"] || "step4"
+      };
+
+      const rows = [];
+      for (const line of rankLines) {
+        if (!/^\d+\./.test(line)) continue;
+
+        if (strategy === "v7") {
+          const matched = line.match(/^(\d+)\.(.+?)\((S[HZ]\d+)\)\s+score:([-\d.]+)\s+short:([-\d.]+|-)?\s+long:([-\d.]+|-)?.*?last4chg:([-\d.]+|-)\s+open:([-\d.]+)\s+close:([-\d.]+)\s+open-close:([-\d.]+)\s*(.*)$/);
+          if (!matched) continue;
+
+          const rank = Number(matched[1]);
+          const code = matched[3];
+          const score = Number(matched[4]);
+          const shortChg = Number(matched[5]);
+          const longChg = Number(matched[6]);
+          const last4 = Number(matched[7]);
+          const open = Number(matched[8]);
+          const close = Number(matched[9]);
+          const detail = detailMap.get(code);
+
+          let last1 = NaN;
+          if ([score, shortChg, longChg].every(Number.isFinite)) {
+            last1 = (14 * shortChg + 3 * longChg - score) / 3;
+          }
+
+          rows.push({
+            rank,
+            name: matched[2],
+            code,
+            score,
+            chg10: shortChg,
+            chg50: longChg,
+            last1,
+            conditions: detail ? detail.conditions : [],
+            filters: detail ? detail.filters : [],
+            pass: detail ? detail.pass : false,
+            note: detail
+              ? ""
+              : `V7 原始排行行未携带 percent / 红K 历史字段，前端仅对“新增信号详细”中的前 4 名做完整条件还原。`,
+            sortMarker: matched[11] || "",
+            open,
+            close,
+            last4
+          });
+          continue;
+        }
+
+        const matched = line.match(/^(\d+)\.(.+?)\((S[HZ]\d+)\)\s+score:([-\d.]+)\s+chg10:([-\d.]+)\s+chg50:([-\d.]+)\s+last1:([-\d.]+|-)\s+time60:([-\d.]+|-)\s+open:([-\d.]+)\s+close:([-\d.]+)\s+percent:([-\d.]+)$/);
+        if (!matched) continue;
+
+        const rank = Number(matched[1]);
+        const score = Number(matched[4]);
+        const chg10 = Number(matched[5]);
+        const chg50 = Number(matched[6]);
+        const last1 = Number(matched[7]);
+        const time60 = Number(matched[8]);
+        const open = Number(matched[9]);
+        const close = Number(matched[10]);
+        const percent = Number(matched[11]);
+        const diff = close - open;
+
+        const conditions = [];
+        const time60Ok = Number.isFinite(time60) && time60 >= -0.06;
+        if (time60Ok && chg50 > 0 && chg10 < -0.1 && rank < 8) {
+          conditions.push({ label: "条件1", reason: `${v8ConditionReasonMap["1"]}；且 ${v8BaseReason}` });
+        }
+        if (time60Ok && diff < -0.001 && rank < 3) {
+          conditions.push({ label: "条件2", reason: `${v8ConditionReasonMap["2"]}；且 ${v8BaseReason}` });
+        }
+        if (time60Ok && percent < -2 && rank < 6) {
+          conditions.push({ label: "条件3", reason: `${v8ConditionReasonMap["3"]}；且 ${v8BaseReason}` });
+        }
+        if (time60Ok && chg50 >= 0 && diff < -0.001 && rank < 3) {
+          conditions.push({ label: "条件4", reason: `${v8ConditionReasonMap["4"]}；且 ${v8BaseReason}` });
+        }
+
+        const filters = [];
+        if (Number.isFinite(time60) && time60 < -0.06) {
+          filters.push({ label: "过滤1", reason: filterRuleMap["1"] || "timechg60 < -0.06" });
+        }
+        if (chg50 < 0 && chg10 < 0.08 && percent < 0) {
+          filters.push({ label: "过滤2", reason: filterRuleMap["2"] || "弱势组合过滤" });
+        }
+
+        rows.push({
+          rank,
+          name: matched[2],
+          code: matched[3],
+          score,
+          chg10,
+          chg50,
+          last1,
+          conditions,
+          filters,
+          pass: conditions.length > 0 && filters.length === 0,
+          note: filters.some(item => item.label === "过滤2") ? "" : "",
+          open,
+          close,
+          percent
+        });
+      }
+
+      return rows;
+    }
+
+    function parseRecentTrades(strategy, sections, summaryInfo) {
+      const buyRuleMap = parseRuleMap(sections["买入条件"] || []);
+      const sellRuleMap = parseRuleMap(sections["卖出条件"] || []);
+      const latestAccountInfo = parseLatestAccountInfo(summaryInfo.summary.latestAccount);
+      const hitLines = (sections["最近命中明细"] || []).filter(line => line && line !== "无" && !line.startsWith("命中/挂单未成"));
+      const sellLines = (sections["最近卖出明细"] || []).filter(line => line && line !== "无");
+      const sellQueues = new Map();
+
+      function enqueueSell(key, payload) {
+        const queue = sellQueues.get(key) || [];
+        queue.push(payload);
+        sellQueues.set(key, queue);
+      }
+
+      function dequeueSell(key) {
+        const queue = sellQueues.get(key) || [];
+        const next = queue.shift() || null;
+        sellQueues.set(key, queue);
+        return next;
+      }
+
+      if (strategy === "v8") {
+        for (const line of sellLines) {
+          const matched = line.match(/^触发卖出日:(\d{4}-\d{2}-\d{2})\s+\|\s+实际卖出日:(\d{4}-\d{2}-\d{2})\s+\|\s+(.+?)\((S[HZ]\d+)\)\s+\|\s+买入:(\d{4}-\d{2}-\d{2})\s+([0-9.]+)\s+\|\s+卖出:开盘\s+([0-9.]+)\s+\|\s+收益:([-\d.]+)%\s+\|\s+卖出原因:卖出条件(\d+)$/);
+          if (!matched) continue;
+
+          const payload = {
+            triggerDate: matched[1],
+            sellDate: matched[2],
+            sellPrice: matched[7],
+            profit: `${matched[8]}%`,
+            accountReturn: `${matched[8]}%`,
+            sellCondition: {
+              label: `条件${matched[9]}`,
+              reason: sellRuleMap[matched[9]] || `卖出条件${matched[9]}`
+            }
+          };
+          enqueueSell(`${matched[4]}|${matched[5]}|${matched[6]}`, payload);
+        }
+
+        return hitLines.map(line => {
+          const matched = line.match(/^(\d{4}-\d{2}-\d{2})\s+命中\s+(.+?)\((S[HZ]\d+)\)\s+\|\s+排名:(\d+)\s+\|\s+score:[-\d.]+\s+\|\s+符合:(step\d+)\s+\|\s+条件:(.+?)\s+\|\s+买入日:(\d{4}-\d{2}-\d{2})\s+\|\s+买入价:([0-9.]+)$/);
+          if (!matched) return null;
+
+          const stepNumber = matched[5].replace("step", "");
+          const sellInfo = dequeueSell(`${matched[3]}|${matched[7]}|${matched[8]}`);
+          const fallbackAccountReturn = sellInfo && latestAccountInfo.date === sellInfo.sellDate && Number.isFinite(latestAccountInfo.value)
+            ? `${formatNumber(latestAccountInfo.value, 4)}%`
+            : "-";
+          const accountReturn = sellInfo ? (sellInfo.accountReturn || fallbackAccountReturn || sellInfo.profit) : "-";
+
+          return {
+            name: matched[2],
+            code: matched[3],
+            buyCondition: {
+              label: `条件${stepNumber}`,
+              reason: buyRuleMap[String(Number(stepNumber) + 1)] || matched[6]
+            },
+            sellCondition: sellInfo ? sellInfo.sellCondition : null,
+            buyDate: matched[7],
+            buyPrice: matched[8],
+            sellDate: sellInfo ? sellInfo.sellDate : "-",
+            sellPrice: sellInfo ? sellInfo.sellPrice : "-",
+            profit: sellInfo ? sellInfo.profit : "-",
+            accountReturn
+          };
+        }).filter(Boolean);
+      }
+
+      for (const line of sellLines) {
+        const matched = line.match(/^实际卖出日:(\d{4}-\d{2}-\d{2})\s+\|\s+(.+?)\((S[HZ]\d+)\)\s+\|\s+信号日:(\d{4}-\d{2}-\d{2})\s+\|\s+买入:(\d{4}-\d{2}-\d{2})\s+([0-9.]+)\s+\|\s+卖出:(\d{4}-\d{2}-\d{2})\s+([0-9.]+)\s+\|\s+单笔收益:([-\d.]+)%\s+\|\s+计入收益:([-\d.]+)%/);
+        if (!matched) continue;
+
+        enqueueSell(`${matched[3]}|${matched[4]}|${matched[5]}|${matched[6]}`, {
+          sellDate: matched[7],
+          sellPrice: matched[8],
+          profit: `${matched[9]}%`,
+          accountReturn: `${matched[10]}%`
+        });
+      }
+
+      return hitLines.map(line => {
+        const matched = line.match(/^(\d{4}-\d{2}-\d{2})\s+命中\s+(.+?)\((S[HZ]\d+)\)\s+\|\s+score:[-\d.]+\s+\|\s+挂单:([0-9.]+)\s+\|\s+计划买入日:(\d{4}-\d{2}-\d{2})\s+\|\s+买入价:([0-9.]+)\s+\|\s+计划卖出日:(\d{4}-\d{2}-\d{2})\s+开盘$/);
+        if (!matched) return null;
+
+        const sellInfo = dequeueSell(`${matched[3]}|${matched[1]}|${matched[5]}|${matched[6]}`);
+        let sellCondition = null;
+        if (sellInfo) {
+          const inferredCondition = sellInfo.sellDate > matched[7] ? "2" : "1";
+          sellCondition = {
+            label: `条件${inferredCondition}`,
+            reason: sellRuleMap[inferredCondition] || `卖出条件${inferredCondition}`
+          };
+        }
+
+        const fallbackAccountReturn = sellInfo && latestAccountInfo.date === sellInfo.sellDate && Number.isFinite(latestAccountInfo.value)
+          ? `${formatNumber(latestAccountInfo.value, 4)}%`
+          : "-";
+        const accountReturn = sellInfo ? (sellInfo.accountReturn || fallbackAccountReturn || sellInfo.profit) : "-";
+
+        return {
+          name: matched[2],
+          code: matched[3],
+          buyCondition: {
+            label: "-",
+            reason: "V7 原始最近命中明细未提供买入条件编号。"
+          },
+          sellCondition,
+          buyDate: matched[5],
+          buyPrice: matched[6],
+          sellDate: sellInfo ? sellInfo.sellDate : "-",
+          sellPrice: sellInfo ? sellInfo.sellPrice : "-",
+          profit: sellInfo ? sellInfo.profit : "-",
+          accountReturn
+        };
+      }).filter(Boolean);
+    }
+
+    function buildParsedPayload(payload) {
+      const lines = splitLines(payload.text);
+      const summaryInfo = extractSummary(lines, payload);
+      const sections = parseSections(lines, summaryInfo);
+      const buyPlans = sections["买入计划"] || [];
+      const holds = sections["当前待结算持仓"] || [];
+      const sellPlans = sections["卖出计划"] || [];
+      const rankRows = parseRankRows(currentStrategy, sections);
+      const recentTrades = parseRecentTrades(currentStrategy, sections, summaryInfo);
+      const sizingEntries = extractBuyPlanEntries(sections);
+      const yearlyMonths = parseMonthLines(summaryInfo.summary.yearlyLines);
+      const latestAccountInfo = parseLatestAccountInfo(summaryInfo.summary.latestAccount);
+
+      return {
+        lines,
+        sections,
+        summaryInfo,
+        buyPlans,
+        holds,
+        sellPlans,
+        rankRows,
+        recentTrades,
+        sizingEntries,
+        yearlyMonths,
+        latestAccountInfo
+      };
+    }
+
+    function renderFlagList(items) {
+      if (!items || !items.length) {
+        return '<span class="flag-chip empty">无</span>';
+      }
+      return items.map(item => renderTooltipChip(item.label, item.reason)).join("");
+    }
+
+    function renderRankingTable(rows) {
+      if (!rows.length) {
+        rankingTableBodyEl.innerHTML = `<tr><td colspan="9">${renderEmptyState("暂无排行数据")}</td></tr>`;
+        return;
+      }
+
+      rankingTableBodyEl.innerHTML = rows.map(row => `
+        <tr>
+          <td class="mono">${escapeHtml(row.rank)}</td>
+          <td class="name-cell">
+            <div class="name-main">${escapeHtml(row.name)}</div>
+            <div class="name-sub mono">${escapeHtml(row.code)}</div>
+          </td>
+          <td class="mono">${escapeHtml(formatNumber(row.score, 4))}</td>
+          <td class="mono">${escapeHtml(formatNumber(row.chg10, 4))}</td>
+          <td class="mono">${escapeHtml(formatNumber(row.chg50, 4))}</td>
+          <td class="mono">${escapeHtml(formatNumber(row.last1, 4))}</td>
+          <td>${renderFlagList(row.conditions)}</td>
+          <td>${renderFlagList(row.filters)}</td>
+          <td>${row.pass ? '<span class="result-chip ok">√</span>' : renderTooltipChip("×", row.note || "买入条件不完整或存在过滤条件", "result-chip bad")}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderTradeTable(rows) {
+      if (!rows.length) {
+        tradeTableBodyEl.innerHTML = `<tr><td colspan="9">${renderEmptyState("暂无最近交易数据")}</td></tr>`;
+        return;
+      }
+
+      tradeTableBodyEl.innerHTML = rows.map(row => `
+        <tr>
+          <td class="name-cell">
+            <div class="name-main">${escapeHtml(row.name)}</div>
+            <div class="name-sub mono">${escapeHtml(row.code)}</div>
+          </td>
+          <td>${row.buyCondition && row.buyCondition.label !== "-" ? renderTooltipChip(row.buyCondition.label, row.buyCondition.reason) : '<span class="flag-chip empty">-</span>'}</td>
+          <td>${row.sellCondition ? renderTooltipChip(row.sellCondition.label, row.sellCondition.reason) : '<span class="flag-chip empty">-</span>'}</td>
+          <td class="mono">${escapeHtml(row.buyDate || "-")}</td>
+          <td class="mono">${escapeHtml(row.buyPrice || "-")}</td>
+          <td class="mono">${escapeHtml(row.sellDate || "-")}</td>
+          <td class="mono">${escapeHtml(row.sellPrice || "-")}</td>
+          <td class="mono">${escapeHtml(row.profit || "-")}</td>
+          <td class="mono">${escapeHtml(row.accountReturn || "-")}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderProfitCards(parsed) {
+      const summary = parsed.summaryInfo.summary;
+      const statsDisplay = resolveStatsDisplay(summary.stats);
+      const cards = [
+        {
+          label: "近450个交易日统计",
+          value: statsDisplay.primary || "暂无统计",
+          copy: statsDisplay.secondary
+            ? `当前 ${currentStrategy.toUpperCase()} 原始统计: ${statsDisplay.secondary}`
+            : "当前策略样例已展示近 450 个交易日统计。"
+        },
+        {
+          label: "最新一卖出账户收益",
+          value: summary.latestAccount || "暂无账户收益",
+          copy: "如果当前明细里没有更新的卖出账户收益，这里会显示为暂无。"
+        },
+        {
+          label: "年度收益",
+          value: summary.yearlyTitle || "暂无年度收益",
+          copy: "下面继续展开每个月的收益分布。"
+        }
+      ];
+
+      profitCardsEl.innerHTML = cards.map(item => `
+        <article class="profit-card">
+          <div class="summary-label">${escapeHtml(item.label)}</div>
+          <strong>${escapeHtml(item.value)}</strong>
+          <div class="summary-copy">${escapeHtml(item.copy)}</div>
+        </article>
+      `).join("");
+
+      yearlyTitleEl.textContent = summary.yearlyTitle || "暂无年度收益";
+      if (!parsed.yearlyMonths.length) {
+        yearlyGridEl.innerHTML = renderEmptyState("暂无月度收益数据");
+        return;
+      }
+      yearlyGridEl.innerHTML = parsed.yearlyMonths.map(item => `
+        <div class="month-card">
+          <span>${escapeHtml(item.month)}</span>
+          <strong class="mono">${escapeHtml(`${formatNumber(item.value, 4)}%`)}</strong>
+        </div>
+      `).join("");
+    }
+
+    function renderOverview(parsed, payload) {
+      const summary = parsed.summaryInfo.summary;
+      heroSummaryEl.innerHTML = `最新交易日: ${escapeHtml(extractHeadlineValue(summary.latestTrade || "最新交易日: -"))}&nbsp;&nbsp;结果来源: ${escapeHtml(resultSource(payload))} | <span class="cache-highlight">最后缓存时间: ${escapeHtml(payload.cached_at || "-")}</span>`;
+      panelNoteEl.textContent = "点击按钮查看对应对话框。";
+    }
+
+    function renderSizingFromParsed(parsed) {
+      if (!parsed) {
+        sizingListEl.innerHTML = renderEmptyState("请先获取策略结果。");
         return;
       }
 
       const amount = parseLooseNumber(capitalInput.value);
       if (!Number.isFinite(amount) || amount <= 0) {
-        sizingListEl.innerHTML = '<div class="sizing-empty">请输入当前金额后再确认。</div>';
+        sizingListEl.innerHTML = renderEmptyState("请输入当前金额后再确认。");
         return;
       }
 
-      const lines = splitLines(payload.text);
-      const summaryInfo = extractSummary(lines, payload);
-      const sections = parseSections(lines, summaryInfo);
-      const entries = extractBuyPlanEntries(lines, sections);
-      const latestAccountLine = summaryInfo.summary.latestAccount;
-
-      if (!entries.length) {
-        sizingListEl.innerHTML = `
-          ${latestAccountLine ? `<div class="sizing-item"><strong>${escapeHtml(latestAccountLine)}</strong></div>` : ""}
-          <div class="sizing-empty">当前买入计划里没有可估算的信号。</div>
-        `;
+      if (!parsed.sizingEntries.length) {
+        sizingListEl.innerHTML = renderEmptyState("当前买入计划里没有可估算的信号。");
         return;
       }
 
-      const extraBlock = latestAccountLine
-        ? `<div class="sizing-item"><strong>${escapeHtml(latestAccountLine)}</strong></div>`
-        : "";
-      const blocks = entries.map(item => {
+      sizingListEl.innerHTML = parsed.sizingEntries.map(item => {
         const shares = roundToHundreds(amount / item.signalClose);
-        const splitInfo = formatSplitInfo(splitMap && splitMap[item.code]);
+        const metrics = [
+          `<span class="sizing-metric"><span>建议数量</span><strong>${escapeHtml(formatShares(shares))} 份</strong></span>`
+        ];
+        if (item.orderPrice && Number.isFinite(item.orderPrice)) {
+          metrics.push(`<span class="sizing-metric"><span>挂单价</span><strong>${escapeHtml(formatNumber(item.orderPrice, 3))}</strong></span>`);
+        }
         return `
-          <div class="sizing-item">
-            <strong>${escapeHtml(item.name)}</strong>: ${escapeHtml(formatShares(shares))} 份
-            <span> | 收盘价 ${escapeHtml(item.signalClose.toFixed(3))}${item.orderPrice && Number.isFinite(item.orderPrice) ? ` | 挂单价 ${escapeHtml(item.orderPrice.toFixed(3))}` : ""} | ${escapeHtml(splitInfo)}</span>
-          </div>
+          <article class="record-card sizing-card">
+            <div class="record-head">
+              <div class="record-title">${escapeHtml(item.name)} (${escapeHtml(item.code)})</div>
+              <div class="sizing-metrics">${metrics.join("")}</div>
+            </div>
+          </article>
         `;
-      });
-
-      sizingListEl.innerHTML = `${extraBlock}${blocks.join("")}`;
+      }).join("");
     }
 
-    async function enrichPlanSectionsWithSplits(sections) {
-      const sectionNames = ["买入计划", "卖出计划"];
-      const splitEntries = [];
-      const updatedSections = {};
+    function renderDialogs(parsed) {
+      const summary = parsed.summaryInfo.summary;
+      const statsDisplay = resolveStatsDisplay(summary.stats);
+      const buyCount = countMeaningfulLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" });
+      const holdCount = countMeaningfulLines(parsed.holds);
+      const sellCount = countMeaningfulLines(parsed.sellPlans);
 
-      for (const sectionName of sectionNames) {
-        const sourceLines = sections[sectionName] || [];
-        updatedSections[sectionName] = sourceLines.map(line => {
-          const baseMatch = line.match(/^(.+?)\((S[HZ]\d+)\)/);
-          if (!baseMatch) return line;
-          if (line.includes("近期拆分:") || line.includes("近期无拆分")) return line;
-          splitEntries.push({ code: baseMatch[2] });
-          return line;
-        });
+      operationDialogNoteEl.textContent = `买入计划:${formatCountLabel(buyCount)}，当前持仓:${formatCountLabel(holdCount)}，卖出计划:${formatCountLabel(sellCount)}`;
+      buyPlanListEl.innerHTML = renderRecordCards(filterMeaningfulLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" }), "暂无买入计划");
+      holdListEl.innerHTML = renderRecordCards(parsed.holds, "暂无当前持仓");
+      sellPlanListEl.innerHTML = renderRecordCards(parsed.sellPlans, "暂无卖出计划");
+      renderSizingFromParsed(parsed);
+
+      rankingDialogNoteEl.textContent = `${extractHeadlineValue(summary.latestTrade || "最新交易日: -")} | ${currentStrategy.toUpperCase()} 最新 score 排行。`;
+      rankingHintEl.textContent = currentStrategy === "v7"
+        ? "V7 的“新增信号详细”只覆盖前 4 名，所以完整买入/过滤判断以这 4 名为准，其余行仅保留排行指标。"
+        : "V8 的买入条件按 step1~step4 显示；过滤条件按最新文本可还原的规则展示。";
+      renderRankingTable(parsed.rankRows);
+
+      tradeDialogNoteEl.textContent = `${currentStrategy.toUpperCase()} 最近交易明细。未结算记录的卖出条件、卖出日期、卖出价格、收益、账户收益都显示为 -。`;
+      tradeHintEl.textContent = currentStrategy === "v7"
+        ? "V7 原始最近命中明细不带买入条件编号，所以“买入条件”列会显示为 -；鼠标停留或点击卖出条件标签可看详细原因。"
+        : "鼠标停留或点击条件标签都可以看具体原因。";
+      renderTradeTable(parsed.recentTrades);
+
+      profitDialogNoteEl.textContent = statsDisplay.secondary
+        ? `${currentStrategy.toUpperCase()} | ${statsDisplay.primary} | 原始 ${currentStrategy.toUpperCase()} 统计: ${statsDisplay.secondary}。`
+        : `${currentStrategy.toUpperCase()} | ${statsDisplay.primary || "近交易日统计: -"}。`;
+      renderProfitCards(parsed);
+    }
+
+    function updateActionTiles(parsed) {
+      if (!parsed) {
+        tileOperationMetaEl.innerHTML = '<span class="meta-pill">暂无数据</span>';
+        tileRankingMetaEl.innerHTML = '<span class="meta-pill">暂无数据</span>';
+        tileTradeMetaEl.innerHTML = '<span class="meta-pill">暂无数据</span>';
+        tileProfitMetaEl.innerHTML = '<span class="meta-pill">暂无数据</span>';
+        return;
       }
 
-      const splitMap = await loadFundSplitMap(splitEntries);
+      const statsDisplay = resolveStatsDisplay(parsed.summaryInfo.summary.stats);
+      const buyPlanCount = countMeaningfulLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" });
+      const holdCount = countMeaningfulLines(parsed.holds);
+      const sellCount = countMeaningfulLines(parsed.sellPlans);
+      const settledCount = parsed.recentTrades.filter(item => item.sellDate && item.sellDate !== "-").length;
 
-      for (const sectionName of sectionNames) {
-        sections[sectionName] = (updatedSections[sectionName] || []).map(line => {
-          const baseMatch = line.match(/^(.+?)\((S[HZ]\d+)\)/);
-          if (!baseMatch) return line;
-          const code = baseMatch[2];
-          return `${line} | ${formatSplitInfo(splitMap[code])}`;
-        });
-      }
-      return splitMap;
+      tileOperationMetaEl.innerHTML = `
+        <span class="meta-pill">买入计划 ${buyPlanCount}</span>
+        <span class="meta-pill">当前持仓 ${holdCount}</span>
+        <span class="meta-pill">卖出计划 ${sellCount}</span>
+      `;
+      tileRankingMetaEl.innerHTML = `
+        <span class="meta-pill">最新排行 ${parsed.rankRows.length} 条</span>
+        <span class="meta-pill">${currentStrategy.toUpperCase()}</span>
+      `;
+      tileTradeMetaEl.innerHTML = `
+        <span class="meta-pill">最近命中 ${parsed.recentTrades.length} 条</span>
+        <span class="meta-pill">已结算 ${settledCount} 条</span>
+      `;
+      const statsMatched = String(statsDisplay.primary || "").match(/^近(\d+)个交易日统计/);
+      tileProfitMetaEl.innerHTML = `
+        <span class="meta-pill">${statsMatched ? `近 ${statsMatched[1]} 个交易日` : "近交易日统计"}</span>
+        <span class="meta-pill">${parsed.yearlyMonths.length} 条月度收益</span>
+      `;
+    }
+
+    function setActionButtonsDisabled(disabled) {
+      [openOperationBtn, openRankingBtn, openTradeBtn, openProfitBtn].forEach(button => {
+        button.disabled = disabled;
+        button.style.opacity = disabled ? "0.62" : "1";
+      });
+    }
+
+    function resetView(message) {
+      currentParsed = null;
+      currentPayload = null;
+      heroSummaryEl.innerHTML = `最新交易日: -&nbsp;&nbsp;结果来源: - | <span class="cache-highlight">最后缓存时间: -</span>`;
+      panelNoteEl.textContent = message;
+      updateActionTiles(null);
+      renderSizingFromParsed(null);
+      buyPlanListEl.innerHTML = renderEmptyState("暂无买入计划");
+      holdListEl.innerHTML = renderEmptyState("暂无当前持仓");
+      sellPlanListEl.innerHTML = renderEmptyState("暂无卖出计划");
+      rankingTableBodyEl.innerHTML = `<tr><td colspan="9">${renderEmptyState("暂无排行数据")}</td></tr>`;
+      tradeTableBodyEl.innerHTML = `<tr><td colspan="9">${renderEmptyState("暂无最近交易数据")}</td></tr>`;
+      profitCardsEl.innerHTML = renderEmptyState("暂无收益数据");
+      yearlyTitleEl.textContent = "暂无年度收益";
+      yearlyGridEl.innerHTML = renderEmptyState("暂无月度收益数据");
+      setActionButtonsDisabled(true);
     }
 
     async function renderPayload(payload) {
       currentPayload = payload;
-      const lines = splitLines(payload.text);
-      const summaryInfo = extractSummary(lines, payload);
-      const sections = parseSections(lines, summaryInfo);
-      const splitMap = await enrichPlanSectionsWithSplits(sections);
-
-      panelEyebrow.textContent = summaryInfo.summary.title || (currentStrategy === "v7" ? "V7 Pro" : "V8 Pro");
-      panelTitle.textContent = currentStrategy === "v7" ? "V7 策略结果" : "V8 策略结果";
-
-      const badges = [
-        summaryInfo.summary.latestTrade || "最新交易日: -",
-        `最后缓存时间: ${payload.cached_at || "-"}`,
-        `结果来源: ${resultSource(payload)}`
-      ];
-      if (summaryInfo.summary.stats) badges.push(summaryInfo.summary.stats);
-      badgesEl.innerHTML = badges.map(item => `<div class="badge">${escapeHtml(item)}</div>`).join("");
-
-      renderSections(sections);
-      renderSizingFromPayload(payload, splitMap);
+      currentParsed = buildParsedPayload(payload);
+      renderOverview(currentParsed, payload);
+      renderDialogs(currentParsed);
+      updateActionTiles(currentParsed);
+      setActionButtonsDisabled(false);
     }
 
     async function fetchJson(url) {
@@ -912,23 +2382,19 @@
         currentPassword = "";
         passwordModalInput.value = "";
         clearStrategyPayloads();
-        currentSplitMap = {};
-        currentPayload = null;
+        resetView("口令错误，请重新输入。");
         setAuthLocked(true, "口令错误，请重新输入。");
       } else if (isFrontendCacheMissError(message)) {
-        badgesEl.innerHTML = "";
-        gridEl.innerHTML = `<section class="section wide"><h3>提示</h3><div class="line">${escapeHtml(message)}</div></section>`;
-        renderSizingFromPayload(null);
+        if (!preserveCurrent || !currentPayload) {
+          resetView(message);
+        }
       } else {
         window.alert(`${statusPrefix}: ${message}`);
+        if (!preserveCurrent || !currentPayload) {
+          resetView(message);
+        }
       }
       setStatus(`${statusPrefix}: ${message}`, true);
-      if (!preserveCurrent || !currentPayload) {
-        currentPayload = null;
-        badgesEl.innerHTML = "";
-        gridEl.innerHTML = `<section class="section wide"><h3>错误</h3><div class="line">${escapeHtml(message)}</div></section>`;
-        renderSizingFromPayload(null);
-      }
     }
 
     async function renderCurrentStrategyFromBundle() {
@@ -943,7 +2409,6 @@
     async function switchStrategy(strategy) {
       currentStrategy = strategy;
       setActiveButton();
-
       try {
         if (!currentPassword.trim()) {
           throw new Error("请先输入口令");
@@ -962,6 +2427,10 @@
 
     async function refreshStrategies() {
       try {
+        if (DEMO_MODE) {
+          await loadDemoBundle();
+          return;
+        }
         if (!currentPassword.trim()) {
           throw new Error("请先输入口令");
         }
@@ -976,15 +2445,48 @@
       }
     }
 
+    async function loadDemoBundle() {
+      if (!DEMO_MODE) return false;
+      try {
+        setStatus("正在载入本地示例数据");
+        setLoading(true, "载入示例数据", "正在读取最新完整交易日的本地样例");
+        const response = await fetch(DEMO_BUNDLE_URL, { cache: "no-store" });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
+        }
+
+        const normalized = normalizeStrategyResults(payload);
+        strategyPayloadMap = {
+          v7: { ...normalized.v7, demo_sample: true, front_cached: false },
+          v8: { ...normalized.v8, demo_sample: true, front_cached: false }
+        };
+        currentPassword = "demo";
+        capitalInput.value = safeStorageGet(AMOUNT_STORAGE_KEY) || DEMO_AMOUNT;
+        setAuthLocked(false);
+        await renderCurrentStrategyFromBundle();
+        setStatus(`示例模式 | 最新完整交易日 ${extractHeadlineValue(currentParsed?.summaryInfo?.summary?.latestTrade || "最新交易日: -")}`);
+        return true;
+      } catch (error) {
+        const message = error && error.message ? error.message : "示例数据读取失败";
+        resetView(message);
+        setAuthLocked(false);
+        setStatus(`示例模式读取失败: ${message}`, true);
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    }
+
     function confirmAmount() {
-      localStorage.setItem(AMOUNT_STORAGE_KEY, capitalInput.value.trim());
-      if (!currentPayload) {
+      safeStorageSet(AMOUNT_STORAGE_KEY, capitalInput.value.trim());
+      if (!currentParsed) {
         setStatus("请先获取策略结果");
-        sizingListEl.innerHTML = '<div class="sizing-empty">请先获取策略结果。</div>';
+        renderSizingFromParsed(null);
         return;
       }
-      setStatus("金额已确认，可查看当前买入计划份数");
-      renderSizingFromPayload(currentPayload);
+      setStatus("金额已确认，可在最新操作对话框查看信号购买数量");
+      renderSizingFromParsed(currentParsed);
     }
 
     async function unlockPage() {
@@ -995,7 +2497,6 @@
       }
       currentPassword = password;
       clearStrategyPayloads();
-      currentSplitMap = {};
       setAuthLocked(false);
       try {
         const cached = loadStrategyBundleCache();
@@ -1003,16 +2504,131 @@
           await renderCurrentStrategyFromBundle();
         } else {
           setStatus("暂无前端缓存，请点击获取最新数据");
-          badgesEl.innerHTML = "";
-          gridEl.innerHTML = '<section class="section wide"><h3>提示</h3><div class="line">暂无前端缓存，请点击获取最新数据</div></section>';
-          renderSizingFromPayload(null);
+          resetView("暂无前端缓存，请点击获取最新数据");
         }
       } catch (error) {
         handleStrategyError(error, "读取失败");
       }
     }
 
-    capitalInput.value = localStorage.getItem(AMOUNT_STORAGE_KEY) || "";
+    function openDialog(dialog) {
+      if (!currentParsed) {
+        setStatus("请先获取策略结果", true);
+        return;
+      }
+      hideTooltip(true);
+      dialog.showModal();
+    }
+
+    function closeDialogById(dialogId) {
+      const dialog = document.getElementById(dialogId);
+      if (dialog && typeof dialog.close === "function") {
+        hideTooltip(true);
+        dialog.close();
+      }
+    }
+
+    function bindDialogBehavior(dialog) {
+      dialog.addEventListener("click", event => {
+        const rect = dialog.getBoundingClientRect();
+        const clickedInDialog = (
+          rect.top <= event.clientY &&
+          event.clientY <= rect.top + rect.height &&
+          rect.left <= event.clientX &&
+          event.clientX <= rect.left + rect.width
+        );
+        if (!clickedInDialog) {
+          dialog.close();
+        }
+      });
+    }
+
+    capitalInput.value = safeStorageGet(AMOUNT_STORAGE_KEY) || (DEMO_MODE ? DEMO_AMOUNT : "");
+
+    document.querySelectorAll("[data-close-dialog]").forEach(button => {
+      button.addEventListener("click", event => {
+        closeDialogById(event.currentTarget.getAttribute("data-close-dialog"));
+      });
+    });
+
+    [operationDialog, rankingDialog, tradeDialog, profitDialog].forEach(bindDialogBehavior);
+
+    function handleTooltipEnter(event) {
+      const trigger = closestTooltipTrigger(event.target);
+      if (!trigger) {
+        return;
+      }
+      if (activeTooltipPinned && activeTooltipTrigger !== trigger) {
+        return;
+      }
+      showTooltip(trigger);
+    }
+
+    function handleTooltipLeave(event) {
+      const trigger = closestTooltipTrigger(event.target);
+      if (!trigger || activeTooltipPinned) {
+        return;
+      }
+      const nextTarget = event.relatedTarget;
+      if (nextTarget && trigger.contains(nextTarget)) {
+        return;
+      }
+      hideTooltip(true);
+    }
+
+    document.addEventListener("pointerover", handleTooltipEnter);
+    document.addEventListener("mouseover", handleTooltipEnter);
+    document.addEventListener("pointerout", handleTooltipLeave);
+    document.addEventListener("mouseout", handleTooltipLeave);
+
+    document.addEventListener("focusin", event => {
+      const trigger = closestTooltipTrigger(event.target);
+      if (trigger) {
+        showTooltip(trigger);
+      }
+    });
+
+    document.addEventListener("focusout", event => {
+      if (!activeTooltipPinned) {
+        hideTooltip(true);
+      }
+    });
+
+    document.addEventListener("click", event => {
+      const trigger = closestTooltipTrigger(event.target);
+      if (trigger) {
+        event.preventDefault();
+        if (activeTooltipPinned && activeTooltipTrigger === trigger) {
+          hideTooltip(true);
+        } else {
+          showTooltip(trigger, { pinned: true });
+        }
+        return;
+      }
+      if (activeTooltipPinned) {
+        hideTooltip(true);
+      }
+    });
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        hideTooltip(true);
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      if (activeTooltipTrigger) {
+        positionTooltip(activeTooltipTrigger);
+      }
+    });
+
+    window.addEventListener("scroll", () => {
+      if (activeTooltipPinned && activeTooltipTrigger) {
+        positionTooltip(activeTooltipTrigger);
+        return;
+      }
+      hideTooltip(true);
+    }, true);
 
     passwordSubmitBtn.addEventListener("click", () => { void unlockPage(); });
     passwordModalInput.addEventListener("keydown", event => {
@@ -1026,15 +2642,26 @@
         confirmAmount();
       }
     });
+
     btnV7.addEventListener("click", () => { void switchStrategy("v7"); });
     btnV8.addEventListener("click", () => { void switchStrategy("v8"); });
     btnRefresh.addEventListener("click", () => { void refreshStrategies(); });
 
+    openOperationBtn.addEventListener("click", () => { openDialog(operationDialog); });
+    openRankingBtn.addEventListener("click", () => { openDialog(rankingDialog); });
+    openTradeBtn.addEventListener("click", () => { openDialog(tradeDialog); });
+    openProfitBtn.addEventListener("click", () => { openDialog(profitDialog); });
+
     setActiveButton();
-    renderSizingFromPayload(null);
-    setStatus("请输入口令后读取前端缓存");
-    setAuthLocked(true);
+    if (DEMO_MODE) {
+      resetView("正在载入本地示例数据");
+      setAuthLocked(false);
+      void loadDemoBundle();
+    } else {
+      resetView("点击按钮前请先输入口令并读取缓存或刷新数据。");
+      setStatus("请输入口令后读取前端缓存");
+      setAuthLocked(true);
+    }
   </script>
 </body>
 </html>
-
