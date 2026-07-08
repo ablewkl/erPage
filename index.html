@@ -338,7 +338,7 @@
       <div class="toolbar">
         <button id="btnV7" class="active">V7</button>
         <button id="btnV8">V8</button>
-        <button id="btnRefresh" class="warn">重新获取</button>
+        <button id="btnRefresh" class="warn">获取最新数据</button>
       </div>
       <div class="status" id="status">请先获取策略结果</div>
       <div class="sizing-card">
@@ -402,13 +402,12 @@
     const passwordSubmitBtn = document.getElementById("passwordSubmitBtn");
     const authErrorEl = document.getElementById("authError");
 
-    const CACHE_PREFIX = "etf_strategy_cache_v3";
     const AMOUNT_STORAGE_KEY = "etf_strategy_amount_v1";
 
     let currentStrategy = "v7";
     let currentPassword = "";
     let currentPayload = null;
-    let staleCacheWarnedKey = '';
+    let strategyPayloadMap = { v7: null, v8: null };
     let currentSplitMap = {};
 
     const SECTION_ORDER = [
@@ -444,18 +443,6 @@
       "卖出:": "最近卖出明细"
     };
 
-    function todayKey() {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const day = String(now.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    }
-
-    function cacheStorageKey(strategy) {
-      return `${CACHE_PREFIX}:${strategy}:${todayKey()}`;
-    }
-
     function isPayloadStructurallyValid(strategy, payload) {
       if (!payload || typeof payload.text !== "string") return false;
       const text = payload.text;
@@ -471,36 +458,27 @@
       return rankCount >= 20;
     }
 
-    function loadFrontCache(strategy) {
-      try {
-        const raw = localStorage.getItem(cacheStorageKey(strategy));
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        if (!parsed || parsed.date !== todayKey()) return null;
-        if (!parsed.payload || !isPayloadStructurallyValid(strategy, parsed.payload)) {
-          localStorage.removeItem(cacheStorageKey(strategy));
-          return null;
-        }
-        return parsed.payload || null;
-      } catch {
-        return null;
-      }
+    function clearStrategyPayloads() {
+      strategyPayloadMap = { v7: null, v8: null };
     }
 
-    function saveFrontCache(strategy, payload) {
-      if (!isPayloadStructurallyValid(strategy, payload)) {
-        throw new Error("返回的数据不完整，已放弃写入缓存");
-      }
-      const wrapped = {
-        strategy,
-        date: todayKey(),
-        cached_at: new Date().toISOString(),
-        payload: {
-          ...payload,
-          front_cached: true
+    function currentStrategyPayload() {
+      return strategyPayloadMap[currentStrategy] || null;
+    }
+
+    function normalizeStrategyResults(payload) {
+      const results = payload && typeof payload.results === "object" ? payload.results : {};
+      const nextMap = { v7: null, v8: null };
+
+      for (const strategy of ["v7", "v8"]) {
+        const result = results[strategy];
+        if (!isPayloadStructurallyValid(strategy, result)) {
+          throw new Error(`${strategy.toUpperCase()} 返回的数据不完整`);
         }
-      };
-      localStorage.setItem(cacheStorageKey(strategy), JSON.stringify(wrapped));
+        nextMap[strategy] = result;
+      }
+
+      return nextMap;
     }
 
     function setStatus(message, isError = false) {
@@ -543,7 +521,10 @@
     }
 
     function resultSource(payload) {
-      return payload && payload.front_cached ? "前端缓存" : "实时请求";
+      if (!payload) return "-";
+      if (payload.cached) return "后端缓存";
+      if (payload.refreshed) return "最新数据";
+      return "策略结果";
     }
 
     function isHeading(line) {
@@ -743,10 +724,8 @@
         currentSplitMap = {};
         return currentSplitMap;
       }
-      const query = encodeURIComponent(codes.join(","));
-      const url = `${baseUrl}/api/fund/splits?password=${encodeURIComponent(currentPassword.trim())}&codes=${query}`;
       try {
-        const payload = await fetchJson(url);
+        const payload = await fetchJson(buildApiUrl("/api/fund/splits", { codes: codes.join(",") }));
         currentSplitMap = payload.items || {};
       } catch {
         currentSplitMap = {};
@@ -797,35 +776,6 @@
       sizingListEl.innerHTML = `${extraBlock}${blocks.join("")}`;
     }
 
-    
-    function isTodayBefore1530() {
-      const now = new Date();
-      return now.getHours() < 15 || (now.getHours() === 15 && now.getMinutes() < 30);
-    }
-
-    function parseCachedAt(value) {
-      if (!value) return null;
-      const text = String(value).trim().replace(' ', 'T');
-      const parsed = new Date(text);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    }
-
-    function maybeWarnStaleCache(payload) {
-      if (!payload || !payload.front_cached) return;
-      const cachedAt = parseCachedAt(payload && payload.cached_at);
-      if (!cachedAt) return;
-      if (!isTodayBefore1530()) return;
-      const today = todayKey();
-      const cachedDay = `${cachedAt.getFullYear()}-${String(cachedAt.getMonth() + 1).padStart(2, '0')}-${String(cachedAt.getDate()).padStart(2, '0')}`;
-      if (cachedDay !== today) return;
-      const threshold = new Date(cachedAt);
-      threshold.setHours(15, 30, 0, 0);
-      if (cachedAt >= threshold) return;
-      const warnKey = `${currentStrategy}:${payload.cached_at}`;
-      if (staleCacheWarnedKey === warnKey) return;
-      staleCacheWarnedKey = warnKey;
-      window.alert('当前的数据可能不是最新!建议重新获取一次!');
-    }
     async function enrichPlanSectionsWithSplits(sections) {
       const sectionNames = ["买入计划", "卖出计划"];
       const splitEntries = [];
@@ -875,11 +825,10 @@
 
       renderSections(sections);
       renderSizingFromPayload(payload, splitMap);
-      maybeWarnStaleCache(payload);
     }
 
     async function fetchJson(url) {
-      const response = await fetch(url);
+      const response = await fetch(url, { cache: "no-store" });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.ok === false) {
         throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
@@ -887,15 +836,28 @@
       return payload;
     }
 
-    function buildUrl(path) {
+    function buildApiUrl(path, params = {}) {
       if (!currentPassword.trim()) {
         throw new Error("请先输入口令");
       }
-      return `${baseUrl}${path}?mode=json&password=${encodeURIComponent(currentPassword.trim())}`;
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          searchParams.set(key, String(value));
+        }
+      });
+      searchParams.set("password", currentPassword.trim());
+      return `${baseUrl}${path}?${searchParams.toString()}`;
     }
 
-    function shouldUseFrontCache(strategy) {
-      return Boolean(loadFrontCache(strategy));
+    async function fetchStrategyBundle(forceRefresh = false) {
+      const params = { mode: "json" };
+      if (forceRefresh) {
+        params.refresh = "1";
+      }
+      const payload = await fetchJson(buildApiUrl("/api/strategies", params));
+      strategyPayloadMap = normalizeStrategyResults(payload);
+      return strategyPayloadMap;
     }
 
     function isPasswordError(message) {
@@ -903,7 +865,37 @@
       return text.includes("Unauthorized") || text.includes("password error");
     }
 
-    async function loadStrategy(strategy, forceNetwork = false) {
+    function handleStrategyError(error, statusPrefix = "请求失败", preserveCurrent = false) {
+      const message = error && error.message ? error.message : "请求失败";
+      if (isPasswordError(message)) {
+        currentPassword = "";
+        passwordModalInput.value = "";
+        clearStrategyPayloads();
+        currentSplitMap = {};
+        currentPayload = null;
+        setAuthLocked(true, "口令错误，请重新输入。");
+      } else {
+        window.alert(`${statusPrefix}: ${message}`);
+      }
+      setStatus(`${statusPrefix}: ${message}`, true);
+      if (!preserveCurrent || !currentPayload) {
+        currentPayload = null;
+        badgesEl.innerHTML = "";
+        gridEl.innerHTML = `<section class="section wide"><h3>错误</h3><div class="line">${escapeHtml(message)}</div></section>`;
+        renderSizingFromPayload(null);
+      }
+    }
+
+    async function renderCurrentStrategyFromBundle() {
+      const payload = currentStrategyPayload();
+      if (!payload) {
+        throw new Error(`暂无 ${currentStrategy.toUpperCase()} 缓存结果，请先获取最新数据`);
+      }
+      setStatus(`完成 | ${currentStrategy.toUpperCase()} | ${resultSource(payload)} | ${payload.cached_at || "-"}`);
+      await renderPayload(payload);
+    }
+
+    async function switchStrategy(strategy) {
       currentStrategy = strategy;
       setActiveButton();
 
@@ -911,60 +903,31 @@
         if (!currentPassword.trim()) {
           throw new Error("请先输入口令");
         }
-
-        if (!forceNetwork && shouldUseFrontCache(strategy)) {
-          const cached = loadFrontCache(strategy);
-          if (cached) {
-            setStatus(`完成 | ${strategy.toUpperCase()} | 前端缓存 | ${cached.cached_at || "-"}`);
-            renderPayload(cached);
-            return;
-          }
+        if (!strategyPayloadMap.v7 || !strategyPayloadMap.v8) {
+          setStatus("读取中: V7 / V8");
+          setLoading(true, "读取缓存", "正在读取 V7 / V8 缓存结果");
+          await fetchStrategyBundle(false);
         }
-
-        const url = buildUrl(`/api/${strategy}`);
-        setStatus(`请求中: ${strategy.toUpperCase()}`);
-        setLoading(true, "请求中", `正在获取 ${strategy.toUpperCase()} 最新结果`);
-        const payload = await fetchJson(url);
-        saveFrontCache(strategy, payload);
-        const cachedPayload = loadFrontCache(strategy);
-        if (!cachedPayload) {
-          throw new Error("缓存校验失败，已拒绝使用不完整数据");
-        }
-        setStatus(`完成 | ${payload.strategy.toUpperCase()} | 实时请求 | ${payload.cached_at || "-"}`);
-        renderPayload({
-          ...cachedPayload,
-          front_cached: false,
-          cached_at: payload.cached_at || cachedPayload.cached_at
-        });
+        await renderCurrentStrategyFromBundle();
       } catch (error) {
-        const message = error.message || "请求失败";
-        if (isPasswordError(message)) {
-          currentPassword = "";
-          passwordModalInput.value = "";
-          setAuthLocked(true, "口令错误，请重新输入。");
-        } else {
-          window.alert(`请求失败: ${message}`);
-        }
-        currentPayload = null;
-        setStatus(`请求失败: ${message}`, true);
-        badgesEl.innerHTML = "";
-        gridEl.innerHTML = `<section class="section wide"><h3>错误</h3><div class="line">${escapeHtml(message)}</div></section>`;
-        renderSizingFromPayload(null);
+        handleStrategyError(error, "读取失败", true);
       } finally {
         setLoading(false);
       }
     }
 
-    async function refreshCurrent() {
+    async function refreshStrategies() {
       try {
         if (!currentPassword.trim()) {
           throw new Error("请先输入口令");
         }
-        setStatus(`刷新中: ${currentStrategy.toUpperCase()}`);
-        setLoading(true, "重新获取", `正在重新请求 ${currentStrategy.toUpperCase()} 并覆盖今日缓存`);
-        await loadStrategy(currentStrategy, true);
+        setStatus("获取中: V7 / V8");
+        setLoading(true, "获取最新数据", "正在获取 V7 / V8 最新结果");
+        await fetchStrategyBundle(true);
+        await renderCurrentStrategyFromBundle();
       } catch (error) {
-        setStatus(`刷新失败: ${error.message}`, true);
+        handleStrategyError(error, "获取失败", true);
+      } finally {
         setLoading(false);
       }
     }
@@ -980,23 +943,34 @@
       renderSizingFromPayload(currentPayload);
     }
 
-    function unlockPage() {
+    async function unlockPage() {
       const password = passwordModalInput.value.trim();
       if (!password) {
         setAuthLocked(true, "请输入访问口令。");
         return;
       }
       currentPassword = password;
+      clearStrategyPayloads();
+      currentSplitMap = {};
       setAuthLocked(false);
-      setStatus("请先获取策略结果");
+      try {
+        setStatus("读取中: V7 / V8");
+        setLoading(true, "读取缓存", "正在读取 V7 / V8 缓存结果");
+        await fetchStrategyBundle(false);
+        await renderCurrentStrategyFromBundle();
+      } catch (error) {
+        handleStrategyError(error, "读取失败");
+      } finally {
+        setLoading(false);
+      }
     }
 
     capitalInput.value = localStorage.getItem(AMOUNT_STORAGE_KEY) || "";
 
-    passwordSubmitBtn.addEventListener("click", unlockPage);
+    passwordSubmitBtn.addEventListener("click", () => { void unlockPage(); });
     passwordModalInput.addEventListener("keydown", event => {
       if (event.key === "Enter") {
-        unlockPage();
+        void unlockPage();
       }
     });
     amountConfirmBtn.addEventListener("click", confirmAmount);
@@ -1005,12 +979,13 @@
         confirmAmount();
       }
     });
-    btnV7.addEventListener("click", () => loadStrategy("v7"));
-    btnV8.addEventListener("click", () => loadStrategy("v8"));
-    btnRefresh.addEventListener("click", refreshCurrent);
+    btnV7.addEventListener("click", () => { void switchStrategy("v7"); });
+    btnV8.addEventListener("click", () => { void switchStrategy("v8"); });
+    btnRefresh.addEventListener("click", () => { void refreshStrategies(); });
 
     setActiveButton();
     renderSizingFromPayload(null);
+    setStatus("请输入口令后读取缓存结果");
     setAuthLocked(true);
   </script>
 </body>
