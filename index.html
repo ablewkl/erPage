@@ -1677,6 +1677,18 @@
       return { value: Number(matched[1]), date: matched[2] };
     }
 
+    function normalizeAccountReturnValue(strategy, value) {
+      if (!Number.isFinite(value)) {
+        return NaN;
+      }
+      return strategy === "v8" ? value / 4 : value;
+    }
+
+    function formatAccountReturn(strategy, value) {
+      const normalized = normalizeAccountReturnValue(strategy, value);
+      return Number.isFinite(normalized) ? `${formatNumber(normalized, 4)}%` : "-";
+    }
+
     function parseRuleMap(lines) {
       const map = {};
       (lines || []).forEach(line => {
@@ -1971,12 +1983,13 @@
           const matched = line.match(/^触发卖出日:(\d{4}-\d{2}-\d{2})\s+\|\s+实际卖出日:(\d{4}-\d{2}-\d{2})\s+\|\s+(.+?)\((S[HZ]\d+)\)\s+\|\s+买入:(\d{4}-\d{2}-\d{2})\s+([0-9.]+)\s+\|\s+卖出:开盘\s+([0-9.]+)\s+\|\s+收益:([-\d.]+)%\s+\|\s+卖出原因:卖出条件(\d+)$/);
           if (!matched) continue;
 
+          const profitValue = Number(matched[8]);
           const payload = {
             triggerDate: matched[1],
             sellDate: matched[2],
             sellPrice: matched[7],
             profit: `${matched[8]}%`,
-            accountReturn: `${matched[8]}%`,
+            accountReturn: formatAccountReturn(strategy, profitValue),
             sellCondition: {
               label: `条件${matched[9]}`,
               reason: sellRuleMap[matched[9]] || `卖出条件${matched[9]}`
