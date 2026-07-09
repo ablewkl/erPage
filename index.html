@@ -2445,7 +2445,7 @@
     }
 
     async function verifyStrategyAccess() {
-      await fetchJson(buildApiUrl("/api/v7/cache"));
+      await fetchJson(buildApiUrl("/api/auth/check"));
     }
 
     function isPasswordError(message) {
