@@ -1696,6 +1696,16 @@
       return { value: Number(matched[1]), date: matched[2] };
     }
 
+    function parseLatestCompoundMultiplier(line) {
+      const matched = String(line || "").match(/复利倍数[:：]?([0-9.]+)倍/);
+      return matched ? Number(matched[1]) : NaN;
+    }
+
+    function formatCompoundMultiplier(line) {
+      const value = parseLatestCompoundMultiplier(line);
+      return Number.isFinite(value) ? `${formatNumber(value, 4)}倍` : "无";
+    }
+
     function normalizeAccountReturnValue(strategy, value) {
       if (!Number.isFinite(value)) {
         return NaN;
@@ -1784,6 +1794,33 @@
         }
       }
       return map;
+    }
+
+    function buildV7SellPlanDisplayLines(parsed) {
+      const sellPlans = parsed?.sellPlans || [];
+      if (currentStrategy !== "v7") {
+        return sellPlans;
+      }
+
+      const closeMap = extractRankCloseMap(parsed?.sections || {});
+      return sellPlans.map(line => {
+        const text = String(line || "").trim();
+        if (!text || text === "无" || text.includes("低开保护价:")) {
+          return line;
+        }
+
+        const matched = text.match(/^(.+?)\((S[HZ]\d+)\)/);
+        if (!matched) {
+          return line;
+        }
+
+        const close = closeMap.get(matched[2]);
+        if (!Number.isFinite(close) || close <= 0) {
+          return line;
+        }
+
+        return `${text} | 低开保护价:${formatNumber(close * 0.978, 3)}`;
+      });
     }
 
     function extractBuyPlanEntries(sections) {
@@ -2286,6 +2323,7 @@
         return;
       }
 
+      const compoundMultiplier = formatCompoundMultiplier(parsed.summaryInfo?.summary?.latestAccount);
       sizingListEl.innerHTML = parsed.sizingEntries.map(item => {
         const shares = roundToHundreds(amount / item.signalClose);
         const metrics = [
@@ -2294,6 +2332,7 @@
         if (item.orderPrice && Number.isFinite(item.orderPrice)) {
           metrics.push(`<span class="sizing-metric"><span>挂单价</span><strong>${escapeHtml(formatNumber(item.orderPrice, 3))}</strong></span>`);
         }
+        metrics.push(`<span class="sizing-metric"><span>复利倍数</span><strong>${escapeHtml(compoundMultiplier)}</strong></span>`);
         metrics.push(`<span class="sizing-metric"><span>最近拆分日期</span><strong>${escapeHtml(formatRecentSplitDate(currentSplitMap[item.code]))}</strong></span>`);
         return `
           <article class="record-card sizing-card">
@@ -2316,7 +2355,7 @@
       operationDialogNoteEl.textContent = `买入计划:${formatCountLabel(buyCount)}，当前持仓:${formatCountLabel(holdCount)}，卖出计划:${formatCountLabel(sellCount)}`;
       buyPlanListEl.innerHTML = renderRecordCards(filterMeaningfulLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" }), "暂无买入计划");
       holdListEl.innerHTML = renderRecordCards(parsed.holds, "暂无当前持仓");
-      sellPlanListEl.innerHTML = renderRecordCards(parsed.sellPlans, "暂无卖出计划");
+      sellPlanListEl.innerHTML = renderRecordCards(buildV7SellPlanDisplayLines(parsed), "暂无卖出计划");
       renderSizingFromParsed(parsed);
 
       rankingDialogNoteEl.textContent = `${extractHeadlineValue(summary.latestTrade || "最新交易日: -")} | ${currentStrategy.toUpperCase()} 最新 score 排行。`;
