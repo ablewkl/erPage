@@ -1361,6 +1361,7 @@
       if (!payload) return "-";
       if (payload.demo_sample) return "本地示例";
       if (payload.front_cached) return "前端缓存";
+      if (payload.cached) return "后端文件缓存";
       if (payload.refreshed) return "最新数据";
       return "策略结果";
     }
@@ -1507,7 +1508,7 @@
 
     function defaultScoreFormula(strategy) {
       return strategy === "v8"
-        ? "15 * chg10 + 7 * chg50 - 4 * last1chg"
+        ? "16 * chg10 + 8 * chg50 - 5 * last1chg"
         : "14 * shorttimechg + 3 * longtimechg - 3 * last1chg";
     }
 
@@ -2443,6 +2444,10 @@
       return saveStrategyBundleCache(payload);
     }
 
+    async function verifyStrategyAccess() {
+      await fetchJson(buildApiUrl("/api/v7/cache"));
+    }
+
     function isPasswordError(message) {
       const text = String(message || "");
       return text.includes("Unauthorized") || text.includes("password error");
@@ -2576,8 +2581,10 @@
       }
       currentPassword = password;
       clearStrategyPayloads();
-      setAuthLocked(false);
       try {
+        setLoading(true, "验证口令", "正在验证访问权限");
+        await verifyStrategyAccess();
+        setAuthLocked(false);
         const cached = loadStrategyBundleCache();
         if (cached && currentStrategyPayload()) {
           await renderCurrentStrategyFromBundle();
@@ -2587,6 +2594,8 @@
         }
       } catch (error) {
         handleStrategyError(error, "读取失败");
+      } finally {
+        setLoading(false);
       }
     }
 
