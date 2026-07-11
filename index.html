@@ -1719,7 +1719,7 @@
             code: entry.code,
             amount,
             price,
-            priceLabel: entry.orderPrice ? "挂单价" : "计划买入价",
+            priceLabel: entry.orderPrice ? "挂单价" : (entry.priceLabel || "计划买入价"),
             shares,
             estimatedCost: shares * price
           });
@@ -2080,13 +2080,16 @@
         const name = baseMatch[1];
         const code = baseMatch[2];
         if (currentStrategy === "v4") {
-          const buyPriceMatch = line.match(/买入价:([0-9.]+)/);
-          if (!buyPriceMatch) continue;
+          const planPrice = closeMap.get(code);
+          if (!Number.isFinite(planPrice) || planPrice <= 0) continue;
           entries.push({
             name,
             code,
-            signalClose: Number(buyPriceMatch[1]),
-            orderPrice: null
+            signalClose: planPrice,
+            orderPrice: null,
+            // V4 buys at the next open, which is unknown at planning time.
+            // Use the signal-day close solely to estimate an order size.
+            priceLabel: "预估开盘价（信号日收盘）"
           });
           continue;
         }
