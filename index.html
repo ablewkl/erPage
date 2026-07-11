@@ -923,6 +923,7 @@
         <div class="toolbar">
           <button id="btnV7" class="active" type="button">V7</button>
           <button id="btnV8" type="button">V8</button>
+          <button id="btnV4" type="button">V4</button>
           <button id="btnRefresh" class="warn" type="button">获取最新数据</button>
         </div>
         <div class="status" id="status">请输入口令后读取前端缓存</div>
@@ -1195,6 +1196,7 @@
     const statusEl = document.getElementById("status");
     const btnV7 = document.getElementById("btnV7");
     const btnV8 = document.getElementById("btnV8");
+    const btnV4 = document.getElementById("btnV4");
     const btnRefresh = document.getElementById("btnRefresh");
     const heroSummaryEl = document.getElementById("heroSummary");
     const panelNoteEl = document.getElementById("panelNote");
@@ -1245,7 +1247,7 @@
     const pageTooltipEl = document.getElementById("conditionTooltip");
 
     const AMOUNT_STORAGE_KEY = "etf_strategy_amount_v1";
-    const STRATEGY_BUNDLE_STORAGE_KEY = "etf_strategy_bundle_v3";
+    const STRATEGY_BUNDLE_STORAGE_KEY = "etf_strategy_bundle_v4";
     const DEMO_BUNDLE_URL = pageParams.get("demoBundle") || (pageParams.get("demo") === "1" ? "./demo/etf_strategy_bundle_latest.json" : "");
     const DEMO_MODE = Boolean(DEMO_BUNDLE_URL);
     const DEMO_AMOUNT = pageParams.get("amount") || "20000";
@@ -1256,6 +1258,7 @@
       "当前待结算持仓": "当前待结算持仓",
       "最新V7挂单计划:": "买入计划",
       "最新V8买入计划:": "买入计划",
+      "最新V4买入计划:": "买入计划",
       "最新交易日score排行:": "最新交易日score排行",
       "新增信号详情:": "新增信号详情",
       "新增信号详细:": "新增信号详情",
@@ -1267,7 +1270,8 @@
       "最近命中/挂单明细:": "最近命中明细",
       "命中/挂单未成交:": "最近命中明细",
       "最近卖出明细:": "最近卖出明细",
-      "卖出:": "最近卖出明细"
+      "卖出:": "最近卖出明细",
+      "最新交易日已触发、待下一交易日开盘卖出的持仓:": "卖出计划"
     };
 
     const SECTION_NAMES = [
@@ -1287,7 +1291,7 @@
     let currentPassword = "";
     let currentPayload = null;
     let currentParsed = null;
-    let strategyPayloadMap = { v7: null, v8: null };
+    let strategyPayloadMap = { v7: null, v8: null, v4: null };
     let currentSplitMap = {};
     let currentSplitRequestId = 0;
     let activeTooltipTrigger = null;
@@ -1331,6 +1335,7 @@
     function setActiveButton() {
       btnV7.classList.toggle("active", currentStrategy === "v7");
       btnV8.classList.toggle("active", currentStrategy === "v8");
+      btnV4.classList.toggle("active", currentStrategy === "v4");
     }
 
     function safeStorageGet(key) {
@@ -1438,6 +1443,11 @@
     function isPayloadStructurallyValid(strategy, payload) {
       if (!payload || typeof payload.text !== "string") return false;
       const text = payload.text;
+      if (strategy === "v4") {
+        return text.includes("最新交易日score排行:")
+          && text.includes("最新V4买入计划:")
+          && text.includes("当前待结算持仓:");
+      }
       if (!text.includes("最新交易日score排行")) return false;
       if (!text.includes("卖出计划")) return false;
       if (strategy === "v7" && !text.includes("最新V7挂单计划")) return false;
@@ -1449,11 +1459,14 @@
       return (sections["最新交易日score排行"] || []).length >= 20;
     }
 
-    function normalizeStrategyResults(payload) {
+    function normalizeStrategyResults(payload, allowMissingV4 = false) {
       const results = payload && typeof payload.results === "object" ? payload.results : {};
-      const nextMap = { v7: null, v8: null };
-      for (const strategy of ["v7", "v8"]) {
+      const nextMap = { v7: null, v8: null, v4: null };
+      for (const strategy of ["v7", "v8", "v4"]) {
         const result = results[strategy];
+        if (strategy === "v4" && allowMissingV4 && !result) {
+          continue;
+        }
         if (!isPayloadStructurallyValid(strategy, result)) {
           throw new Error(`${strategy.toUpperCase()} 返回的数据不完整`);
         }
@@ -1473,7 +1486,8 @@
       );
       strategyPayloadMap = {
         v7: { ...normalized.v7, front_cached: false },
-        v8: { ...normalized.v8, front_cached: false }
+        v8: { ...normalized.v8, front_cached: false },
+        v4: { ...normalized.v4, front_cached: false }
       };
       return strategyPayloadMap;
     }
@@ -1484,14 +1498,15 @@
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         const normalized = normalizeStrategyResults(parsed);
-        strategyPayloadMap = {
-          v7: { ...normalized.v7, front_cached: true },
-          v8: { ...normalized.v8, front_cached: true }
+      strategyPayloadMap = {
+        v7: { ...normalized.v7, front_cached: true },
+        v8: { ...normalized.v8, front_cached: true },
+        v4: { ...normalized.v4, front_cached: true }
         };
         return strategyPayloadMap;
       } catch {
         safeStorageRemove(STRATEGY_BUNDLE_STORAGE_KEY);
-        strategyPayloadMap = { v7: null, v8: null };
+        strategyPayloadMap = { v7: null, v8: null, v4: null };
         return null;
       }
     }
@@ -1501,15 +1516,19 @@
     }
 
     function clearStrategyPayloads() {
-      strategyPayloadMap = { v7: null, v8: null };
+      strategyPayloadMap = { v7: null, v8: null, v4: null };
       currentSplitMap = {};
       currentSplitRequestId += 1;
     }
 
     function defaultScoreFormula(strategy) {
-      return strategy === "v8"
-        ? "16 * chg10 + 8 * chg50 - 5 * last1chg"
-        : "14 * shorttimechg + 3 * longtimechg - 3 * last1chg";
+      if (strategy === "v8") {
+        return "16 * chg10 + 8 * chg50 - 5 * last1chg";
+      }
+      if (strategy === "v4") {
+        return "26 * shorttimechg + 12 * longtimechg";
+      }
+      return "14 * shorttimechg + 3 * longtimechg - 3 * last1chg";
     }
 
     function extractSummary(lines, payload) {
@@ -1660,7 +1679,7 @@
         return { primary: currentStats, secondary: "" };
       }
 
-      for (const strategy of ["v7", "v8"]) {
+      for (const strategy of ["v7", "v8", "v4"]) {
         const candidate = extractStatsLineFromPayload(strategyPayloadMap[strategy]);
         if (/^近450个交易日统计:/.test(candidate)) {
           return {
@@ -1836,6 +1855,17 @@
 
         const name = baseMatch[1];
         const code = baseMatch[2];
+        if (currentStrategy === "v4") {
+          const buyPriceMatch = line.match(/买入价:([0-9.]+)/);
+          if (!buyPriceMatch) continue;
+          entries.set(code, {
+            name,
+            code,
+            signalClose: Number(buyPriceMatch[1]),
+            orderPrice: null
+          });
+          continue;
+        }
         const signalCloseMatch = line.match(/信号日收盘:([0-9.]+)/);
         const orderPriceMatch = line.match(/(?:挂单价:|计划下一交易日挂单\s*)([0-9.]+)/);
         const signalClose = signalCloseMatch
@@ -1950,6 +1980,12 @@
         "3": buyRuleMap["4"] || "step3",
         "4": buyRuleMap["5"] || "step4"
       };
+      const v4BuyCodes = new Set(
+        (sections["买入计划"] || [])
+          .filter(line => line.includes("买入价:"))
+          .map(line => line.match(/\((S[HZ]\d+)\)/)?.[1])
+          .filter(Boolean)
+      );
 
       const rows = [];
       for (const line of rankLines) {
@@ -1996,6 +2032,56 @@
           continue;
         }
 
+        if (strategy === "v4") {
+          const matched = line.match(/^(\d+)\.(.+?)\((S[HZ]\d+)\)\s+score:([-\d.]+)\s+short:([-\d.]+)\s+long:([-\d.]+)\s+last1:([-\d.]+|-)\s+time60:([-\d.]+|-)\s+open:([-\d.]+)\s+close:([-\d.]+)\s+percent:([-\d.]+)$/);
+          if (!matched) continue;
+
+          const rank = Number(matched[1]);
+          const code = matched[3];
+          const time60 = matched[8] === "-" ? NaN : Number(matched[8]);
+          const open = Number(matched[9]);
+          const close = Number(matched[10]);
+          const percent = Number(matched[11]);
+          const conditions = [];
+          const filters = [];
+          const selected = v4BuyCodes.has(code);
+
+          if (rank <= 4) {
+            conditions.push({ label: "前4", reason: "V4 只从最新 score 排名前 4 的 ETF 中选择候选。" });
+          } else {
+            filters.push({ label: "排名", reason: "未进入 V4 前 4 候选。" });
+          }
+          if (Number.isFinite(time60) && time60 >= -0.028723) {
+            conditions.push({ label: "60日", reason: "time60 达到 V4 基础阈值。" });
+          } else {
+            filters.push({ label: "60日", reason: "time60 未达到 V4 基础阈值。" });
+          }
+          if (open > close) {
+            conditions.push({ label: "阴线", reason: "当日开盘价高于收盘价。" });
+          }
+          if (percent < 0) {
+            conditions.push({ label: "收跌", reason: "当日涨跌幅为负。" });
+          }
+
+          rows.push({
+            rank,
+            name: matched[2],
+            code,
+            score: Number(matched[4]),
+            chg10: Number(matched[5]),
+            chg50: Number(matched[6]),
+            last1: matched[7] === "-" ? NaN : Number(matched[7]),
+            conditions,
+            filters,
+            pass: selected,
+            note: selected ? "已进入 V4 最新买入计划。" : "未进入 V4 最新买入计划。",
+            open,
+            close,
+            percent
+          });
+          continue;
+        }
+
         const matched = line.match(/^(\d+)\.(.+?)\((S[HZ]\d+)\)\s+score:([-\d.]+)\s+chg10:([-\d.]+)\s+chg50:([-\d.]+)\s+last1:([-\d.]+|-)\s+time60:([-\d.]+|-)\s+open:([-\d.]+)\s+close:([-\d.]+)\s+percent:([-\d.]+)$/);
         if (!matched) continue;
 
@@ -2012,7 +2098,7 @@
 
         const conditions = [];
         const time60Ok = Number.isFinite(time60) && time60 >= -0.06;
-        if (time60Ok && chg50 > 0 && chg10 < -0.1 && rank < 8) {
+        if (time60Ok && chg50 > -0.05 && chg10 < -0.1 && rank < 8) {
           conditions.push({ label: "条件1", reason: `${v8ConditionReasonMap["1"]}；且 ${v8BaseReason}` });
         }
         if (time60Ok && diff < -0.001 && rank < 3) {
@@ -2021,7 +2107,7 @@
         if (time60Ok && percent < -2 && rank < 6) {
           conditions.push({ label: "条件3", reason: `${v8ConditionReasonMap["3"]}；且 ${v8BaseReason}` });
         }
-        if (time60Ok && chg50 >= 0 && diff < -0.001 && rank < 3) {
+        if (time60Ok && chg50 > -0.05 && diff < -0.001 && rank < 3) {
           conditions.push({ label: "条件4", reason: `${v8ConditionReasonMap["4"]}；且 ${v8BaseReason}` });
         }
 
@@ -2073,6 +2159,73 @@
         const next = queue.shift() || null;
         sellQueues.set(key, queue);
         return next;
+      }
+
+      if (strategy === "v4") {
+        const pendingQueues = new Map();
+        const enqueuePending = (key, payload) => {
+          const queue = pendingQueues.get(key) || [];
+          queue.push(payload);
+          pendingQueues.set(key, queue);
+        };
+        const dequeuePending = key => {
+          const queue = pendingQueues.get(key) || [];
+          const next = queue.shift() || null;
+          pendingQueues.set(key, queue);
+          return next;
+        };
+
+        for (const line of sellLines) {
+          const matched = line.match(/^触发卖出日:(\d{4}-\d{2}-\d{2})\s+\|\s+实际卖出日:(\d{4}-\d{2}-\d{2})\s+\|\s+(.+?)\((S[HZ]\d+)\)\s+\|\s+买入:(\d{4}-\d{2}-\d{2})\s+([0-9.]+)\s+\|\s+卖出:开盘\s+([0-9.]+)\s+\|\s+收益:([-\d.]+)%$/);
+          if (!matched) continue;
+          enqueueSell(`${matched[4]}|${matched[5]}|${matched[6]}`, {
+            triggerDate: matched[1],
+            sellDate: matched[2],
+            sellPrice: matched[7],
+            profit: `${matched[8]}%`
+          });
+        }
+
+        for (const line of sections["卖出计划"] || []) {
+          const matched = line.match(/^触发卖出日:(\d{4}-\d{2}-\d{2})\s+\|\s+(.+?)\((S[HZ]\d+)\)\s+\|\s+买入:(\d{4}-\d{2}-\d{2})\s+([0-9.]+)\s+\|\s+实际卖出日:(\d{4}-\d{2}-\d{2})\s+开盘待卖/);
+          if (!matched) continue;
+          enqueuePending(`${matched[3]}|${matched[4]}|${matched[5]}`, {
+            triggerDate: matched[1],
+            sellDate: matched[6]
+          });
+        }
+
+        return hitLines.map(line => {
+          const matched = line.match(/^(\d{4}-\d{2}-\d{2})\s+命中\s+(.+?)\((S[HZ]\d+)\)\s+\|\s+排名:(\d+)\s+\|\s+score:([-\d.]+)\s+\|\s+买入日:(\d{4}-\d{2}-\d{2})\s+\|\s+买入价:([0-9.]+)$/);
+          if (!matched) return null;
+
+          const key = `${matched[3]}|${matched[6]}|${matched[7]}`;
+          const sellInfo = dequeueSell(key);
+          const pendingInfo = dequeuePending(key);
+          const accountReturn = sellInfo && latestAccountInfo.date === sellInfo.sellDate && Number.isFinite(latestAccountInfo.value)
+            ? `${formatNumber(latestAccountInfo.value, 4)}%`
+            : sellInfo?.profit || "-";
+
+          return {
+            name: matched[2],
+            code: matched[3],
+            buyCondition: {
+              label: `排名${matched[4]}`,
+              reason: `信号日: ${matched[1]}\nscore: ${matched[5]}`
+            },
+            sellCondition: sellInfo
+              ? { label: "已卖出", reason: `触发卖出日: ${sellInfo.triggerDate}` }
+              : pendingInfo
+                ? { label: "待卖出", reason: `触发卖出日: ${pendingInfo.triggerDate}` }
+                : null,
+            buyDate: matched[6],
+            buyPrice: matched[7],
+            sellDate: sellInfo?.sellDate || pendingInfo?.sellDate || "-",
+            sellPrice: sellInfo?.sellPrice || "-",
+            profit: sellInfo?.profit || "-",
+            accountReturn
+          };
+        }).filter(Boolean);
       }
 
       if (strategy === "v8") {
@@ -2362,13 +2515,17 @@
       rankingFormulaEl.textContent = summary.scoreFormula || `score公式: ${defaultScoreFormula(currentStrategy)}`;
       rankingHintEl.textContent = currentStrategy === "v7"
         ? "V7 的“新增信号详细”只覆盖前 4 名，所以完整买入/过滤判断以这 4 名为准，其余行仅保留排行指标。"
-        : "V8 的买入条件按 step1~step4 显示；过滤条件按最新文本可还原的规则展示。";
+        : currentStrategy === "v4"
+          ? "V4 的原始结果不单列完整条件编号，主页面按最新买入计划、排名和 time60 展示可还原的观察条件。"
+          : "V8 的买入条件按 step1~step4 显示；过滤条件按最新文本可还原的规则展示。";
       renderRankingTable(parsed.rankRows);
 
       tradeDialogNoteEl.textContent = `${currentStrategy.toUpperCase()} 最近交易明细。未结算记录的卖出条件、卖出日期、卖出价格、收益、账户收益都显示为 -。`;
       tradeHintEl.textContent = currentStrategy === "v7"
         ? "V7 原始最近命中明细不带买入条件编号，所以“买入条件”列会显示为 -；鼠标停留或点击卖出条件标签可看详细原因。"
-        : "鼠标停留或点击条件标签都可以看具体原因。";
+        : currentStrategy === "v4"
+          ? "V4 按命中、已卖出和待开盘卖出记录匹配交易明细。"
+          : "鼠标停留或点击条件标签都可以看具体原因。";
       renderTradeTable(parsed.recentTrades);
 
       profitDialogNoteEl.textContent = statsDisplay.secondary
@@ -2496,7 +2653,8 @@
       const text = String(message || "");
       return text.includes("暂无前端缓存")
         || text.includes("暂无 V7 缓存结果")
-        || text.includes("暂无 V8 缓存结果");
+        || text.includes("暂无 V8 缓存结果")
+        || text.includes("暂无 V4 缓存结果");
     }
 
     function handleStrategyError(error, statusPrefix = "请求失败", preserveCurrent = false) {
@@ -2536,7 +2694,7 @@
         if (!currentPassword.trim()) {
           throw new Error("请先输入口令");
         }
-        if (!strategyPayloadMap.v7 || !strategyPayloadMap.v8) {
+        if (!strategyPayloadMap.v7 || !strategyPayloadMap.v8 || !strategyPayloadMap.v4) {
           const cached = loadStrategyBundleCache();
           if (!cached) {
             throw new Error("暂无前端缓存结果，请点击获取最新数据");
@@ -2557,8 +2715,8 @@
         if (!currentPassword.trim()) {
           throw new Error("请先输入口令");
         }
-        setStatus("获取中: V7 / V8");
-        setLoading(true, "获取最新数据", "正在获取 V7 / V8 最新结果");
+        setStatus("获取中: V7 / V8 / V4");
+        setLoading(true, "获取最新数据", "正在获取 V7 / V8 / V4 最新结果");
         await fetchStrategyBundle(true);
         await renderCurrentStrategyFromBundle();
       } catch (error) {
@@ -2579,10 +2737,11 @@
           throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
         }
 
-        const normalized = normalizeStrategyResults(payload);
+        const normalized = normalizeStrategyResults(payload, true);
         strategyPayloadMap = {
           v7: { ...normalized.v7, demo_sample: true, front_cached: false },
-          v8: { ...normalized.v8, demo_sample: true, front_cached: false }
+          v8: { ...normalized.v8, demo_sample: true, front_cached: false },
+          v4: null
         };
         currentPassword = "demo";
         capitalInput.value = safeStorageGet(AMOUNT_STORAGE_KEY) || DEMO_AMOUNT;
@@ -2772,6 +2931,7 @@
 
     btnV7.addEventListener("click", () => { void switchStrategy("v7"); });
     btnV8.addEventListener("click", () => { void switchStrategy("v8"); });
+    btnV4.addEventListener("click", () => { void switchStrategy("v4"); });
     btnRefresh.addEventListener("click", () => { void refreshStrategies(); });
 
     openOperationBtn.addEventListener("click", () => { openDialog(operationDialog); });
