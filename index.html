@@ -1668,27 +1668,8 @@
       return count > 0 ? `${count}份` : "无";
     }
 
-    function extractStatsLineFromPayload(payload) {
-      if (!payload || typeof payload.text !== "string") return "";
-      return splitLines(payload.text).find(line => /^近\d+个交易日统计:/.test(line.trim())) || "";
-    }
-
     function resolveStatsDisplay(summaryStats) {
       const currentStats = String(summaryStats || "").trim();
-      if (/^近450个交易日统计:/.test(currentStats)) {
-        return { primary: currentStats, secondary: "" };
-      }
-
-      for (const strategy of ["v7", "v8", "v4"]) {
-        const candidate = extractStatsLineFromPayload(strategyPayloadMap[strategy]);
-        if (/^近450个交易日统计:/.test(candidate)) {
-          return {
-            primary: candidate,
-            secondary: candidate === currentStats ? "" : currentStats
-          };
-        }
-      }
-
       return {
         primary: currentStats || "近交易日统计: -",
         secondary: ""
@@ -2414,11 +2395,9 @@
       const statsDisplay = resolveStatsDisplay(summary.stats);
       const cards = [
         {
-          label: "近450个交易日统计",
+          label: "当前策略统计",
           value: statsDisplay.primary || "暂无统计",
-          copy: statsDisplay.secondary
-            ? `当前 ${currentStrategy.toUpperCase()} 原始统计: ${statsDisplay.secondary}`
-            : "当前策略样例已展示近 450 个交易日统计。"
+          copy: "按当前策略自身的交易日窗口统计。"
         },
         {
           label: "最新一卖出账户收益",
