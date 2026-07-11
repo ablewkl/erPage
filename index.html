@@ -710,6 +710,29 @@
       line-height: 1.65;
     }
 
+    .all-operation-amounts {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .all-operation-field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .all-operation-field label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .all-operation-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
     #tradeDialog .dialog-shell {
       max-height: min(92vh, 980px);
     }
@@ -895,6 +918,10 @@
         grid-template-columns: minmax(0, 1fr) auto;
       }
 
+      .all-operation-amounts {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
       .profit-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
@@ -924,6 +951,7 @@
           <button id="btnV7" class="active" type="button">V7</button>
           <button id="btnV8" type="button">V8</button>
           <button id="btnV4" type="button">V4</button>
+          <button id="openAllOperationsBtn" type="button">全部操作</button>
           <button id="btnRefresh" class="warn" type="button">获取最新数据</button>
         </div>
         <div class="status" id="status">请输入口令后读取前端缓存</div>
@@ -1070,6 +1098,54 @@
     </div>
   </dialog>
 
+  <dialog id="allOperationsDialog">
+    <div class="dialog-shell">
+      <div class="dialog-head">
+        <div>
+          <h3>全部操作</h3>
+          <p>V4、V7、V8 的买入计划按输入金额合并；同一 ETF 保留各策略订单价格和份额。</p>
+        </div>
+        <button class="dialog-close" data-close-dialog="allOperationsDialog" type="button">×</button>
+      </div>
+      <div class="dialog-body">
+        <section class="dialog-section wide">
+          <h4>策略金额</h4>
+          <p class="section-note">V4 和 V8 为 1/4 仓位，V7 为 1/2 仓位。输入金额直接用于每条对应策略计划的份额计算，不再按仓位比例换算。</p>
+          <div class="all-operation-amounts">
+            <div class="all-operation-field">
+              <label for="allV4Amount">V4 金额</label>
+              <input id="allV4Amount" class="capital" type="text" inputmode="decimal" placeholder="例如 15000" />
+            </div>
+            <div class="all-operation-field">
+              <label for="allV7Amount">V7 金额</label>
+              <input id="allV7Amount" class="capital" type="text" inputmode="decimal" placeholder="例如 20000" />
+            </div>
+            <div class="all-operation-field">
+              <label for="allV8Amount">V8 金额</label>
+              <input id="allV8Amount" class="capital" type="text" inputmode="decimal" placeholder="例如 30000" />
+            </div>
+          </div>
+          <div class="capital-row">
+            <div class="section-note">确认后按每条买入或待卖记录分别计算整百份额。</div>
+            <button id="allOperationsConfirmBtn" class="dialog-btn" type="button">确认金额</button>
+          </div>
+          <div id="allOperationsSummary" class="all-operation-summary"></div>
+        </section>
+
+        <section class="dialog-section wide">
+          <h4>合并买入计划</h4>
+          <div id="allBuyPlanList" class="card-list"></div>
+        </section>
+
+        <section class="dialog-section wide">
+          <h4>合并卖出计划</h4>
+          <div id="allSellPlanList" class="card-list"></div>
+        </section>
+      </div>
+      <div id="allOperationsTooltip" class="floating-tooltip" role="tooltip" hidden></div>
+    </div>
+  </dialog>
+
   <dialog id="rankingDialog">
     <div class="dialog-shell">
       <div class="dialog-head">
@@ -1197,6 +1273,7 @@
     const btnV7 = document.getElementById("btnV7");
     const btnV8 = document.getElementById("btnV8");
     const btnV4 = document.getElementById("btnV4");
+    const openAllOperationsBtn = document.getElementById("openAllOperationsBtn");
     const btnRefresh = document.getElementById("btnRefresh");
     const heroSummaryEl = document.getElementById("heroSummary");
     const panelNoteEl = document.getElementById("panelNote");
@@ -1211,6 +1288,7 @@
     const openProfitBtn = document.getElementById("openProfitBtn");
 
     const operationDialog = document.getElementById("operationDialog");
+    const allOperationsDialog = document.getElementById("allOperationsDialog");
     const rankingDialog = document.getElementById("rankingDialog");
     const tradeDialog = document.getElementById("tradeDialog");
     const profitDialog = document.getElementById("profitDialog");
@@ -1222,6 +1300,14 @@
     const buyPlanListEl = document.getElementById("buyPlanList");
     const holdListEl = document.getElementById("holdList");
     const sellPlanListEl = document.getElementById("sellPlanList");
+
+    const allV4AmountInput = document.getElementById("allV4Amount");
+    const allV7AmountInput = document.getElementById("allV7Amount");
+    const allV8AmountInput = document.getElementById("allV8Amount");
+    const allOperationsConfirmBtn = document.getElementById("allOperationsConfirmBtn");
+    const allOperationsSummaryEl = document.getElementById("allOperationsSummary");
+    const allBuyPlanListEl = document.getElementById("allBuyPlanList");
+    const allSellPlanListEl = document.getElementById("allSellPlanList");
 
     const rankingDialogNoteEl = document.getElementById("rankingDialogNote");
     const rankingFormulaEl = document.getElementById("rankingFormula");
@@ -1519,6 +1605,163 @@
       strategyPayloadMap = { v7: null, v8: null, v4: null };
       currentSplitMap = {};
       currentSplitRequestId += 1;
+    }
+
+    function buildParsedPayloadForStrategy(strategy, payload) {
+      const previousStrategy = currentStrategy;
+      currentStrategy = strategy;
+      try {
+        return buildParsedPayload(payload);
+      } finally {
+        currentStrategy = previousStrategy;
+      }
+    }
+
+    function floorToHundreds(value) {
+      if (!Number.isFinite(value) || value <= 0) return 0;
+      return Math.floor(value / 100) * 100;
+    }
+
+    function allOperationAmounts() {
+      return {
+        v4: parseLooseNumber(allV4AmountInput.value),
+        v7: parseLooseNumber(allV7AmountInput.value),
+        v8: parseLooseNumber(allV8AmountInput.value)
+      };
+    }
+
+    function parseSellPlanEntries(strategy, parsed) {
+      const entries = [];
+      for (const line of parsed.sellPlans || []) {
+        const etfMatch = String(line).match(/(?:^|\|\s*)([^|()]+?)\((S[HZ]\d+)\)/);
+        if (!etfMatch) continue;
+        const buyPriceMatch = String(line).match(/买入:\s*(?:\d{4}-\d{2}-\d{2}\s+)?([0-9.]+)/)
+          || String(line).match(/买入价:([0-9.]+)/);
+        if (!buyPriceMatch) continue;
+        const buyPrice = Number(buyPriceMatch[1]);
+        if (!Number.isFinite(buyPrice) || buyPrice <= 0) continue;
+        entries.push({
+          strategy,
+          name: etfMatch[1].trim(),
+          code: etfMatch[2],
+          buyPrice
+        });
+      }
+      return entries;
+    }
+
+    function groupOperationLegs(legs) {
+      const grouped = new Map();
+      for (const leg of legs) {
+        const current = grouped.get(leg.code) || {
+          name: leg.name,
+          code: leg.code,
+          requestedAmount: 0,
+          estimatedCost: 0,
+          shares: 0,
+          legs: []
+        };
+        current.requestedAmount += leg.amount;
+        current.estimatedCost += leg.estimatedCost;
+        current.shares += leg.shares;
+        current.legs.push(leg);
+        grouped.set(leg.code, current);
+      }
+      return Array.from(grouped.values()).sort((left, right) => left.code.localeCompare(right.code));
+    }
+
+    function renderAllOperationCards(groups, type) {
+      if (!groups.length) {
+        return renderEmptyState(type === "buy" ? "暂无可执行的买入计划" : "暂无待卖出计划");
+      }
+      return groups.map(group => {
+        const totals = type === "buy"
+          ? `<div class="chip-row"><span class="chip">计划金额 ${escapeHtml(formatNumber(group.requestedAmount, 2))}</span><span class="chip">预计金额 ${escapeHtml(formatNumber(group.estimatedCost, 2))}</span><span class="chip">合计 ${escapeHtml(formatShares(group.shares))} 份</span></div>`
+          : `<div class="chip-row"><span class="chip">合计 ${escapeHtml(formatShares(group.shares))} 份</span></div>`;
+        const details = group.legs.map(leg => type === "buy"
+          ? `${leg.strategy.toUpperCase()}：金额 ${formatNumber(leg.amount, 2)}，${leg.priceLabel} ${formatNumber(leg.price, 3)}，${formatShares(leg.shares)} 份`
+          : `${leg.strategy.toUpperCase()}：${formatShares(leg.shares)} 份`
+        );
+        return `
+          <article class="record-card">
+            <div class="record-title">${escapeHtml(group.name)} (${escapeHtml(group.code)})</div>
+            ${totals}
+            <div class="record-copy">${escapeHtml(details.join("\n"))}</div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function renderAllOperations() {
+      const amounts = allOperationAmounts();
+      const strategies = ["v4", "v7", "v8"];
+      if (strategies.some(strategy => !strategyPayloadMap[strategy])) {
+        allOperationsSummaryEl.innerHTML = '<span class="result-chip bad">请先获取 V4 / V7 / V8 最新数据</span>';
+        allBuyPlanListEl.innerHTML = renderEmptyState("暂无完整策略结果");
+        allSellPlanListEl.innerHTML = renderEmptyState("暂无完整策略结果");
+        return;
+      }
+
+      const buyLegs = [];
+      const sellLegs = [];
+      for (const strategy of strategies) {
+        const amount = amounts[strategy];
+        if (!Number.isFinite(amount) || amount <= 0) continue;
+        const parsed = buildParsedPayloadForStrategy(strategy, strategyPayloadMap[strategy]);
+
+        for (const entry of parsed.sizingEntries) {
+          const price = Number(entry.orderPrice || entry.signalClose);
+          const shares = floorToHundreds(amount / price);
+          if (!shares) continue;
+          buyLegs.push({
+            strategy,
+            name: entry.name,
+            code: entry.code,
+            amount,
+            price,
+            priceLabel: entry.orderPrice ? "挂单价" : "计划买入价",
+            shares,
+            estimatedCost: shares * price
+          });
+        }
+
+        for (const entry of parseSellPlanEntries(strategy, parsed)) {
+          const shares = floorToHundreds(amount / entry.buyPrice);
+          if (!shares) continue;
+          sellLegs.push({
+            ...entry,
+            amount,
+            shares,
+            estimatedCost: 0
+          });
+        }
+      }
+
+      const buyGroups = groupOperationLegs(buyLegs);
+      const sellGroups = groupOperationLegs(sellLegs);
+      const totalRequested = buyLegs.reduce((total, leg) => total + leg.amount, 0);
+      const totalEstimatedCost = buyLegs.reduce((total, leg) => total + leg.estimatedCost, 0);
+      const totalBuyShares = buyLegs.reduce((total, leg) => total + leg.shares, 0);
+      const totalSellShares = sellLegs.reduce((total, leg) => total + leg.shares, 0);
+
+      allOperationsSummaryEl.innerHTML = `
+        <span class="meta-pill">买入 ${buyGroups.length} 只 ETF</span>
+        <span class="meta-pill">计划金额 ${escapeHtml(formatNumber(totalRequested, 2))}</span>
+        <span class="meta-pill">预计金额 ${escapeHtml(formatNumber(totalEstimatedCost, 2))}</span>
+        <span class="meta-pill">买入 ${escapeHtml(formatShares(totalBuyShares))} 份</span>
+        <span class="meta-pill">卖出 ${sellGroups.length} 只 ETF / ${escapeHtml(formatShares(totalSellShares))} 份</span>
+      `;
+      allBuyPlanListEl.innerHTML = renderAllOperationCards(buyGroups, "buy");
+      allSellPlanListEl.innerHTML = renderAllOperationCards(sellGroups, "sell");
+    }
+
+    function openAllOperations() {
+      if (!strategyPayloadMap.v4 || !strategyPayloadMap.v7 || !strategyPayloadMap.v8) {
+        setStatus("请先获取 V4 / V7 / V8 最新数据", true);
+        return;
+      }
+      allOperationsDialog.showModal();
+      renderAllOperations();
     }
 
     function defaultScoreFormula(strategy) {
@@ -1825,7 +2068,7 @@
 
     function extractBuyPlanEntries(sections) {
       const closeMap = extractRankCloseMap(sections);
-      const entries = new Map();
+      const entries = [];
       const buyLines = sections["买入计划"] || [];
 
       for (const line of buyLines) {
@@ -1839,7 +2082,7 @@
         if (currentStrategy === "v4") {
           const buyPriceMatch = line.match(/买入价:([0-9.]+)/);
           if (!buyPriceMatch) continue;
-          entries.set(code, {
+          entries.push({
             name,
             code,
             signalClose: Number(buyPriceMatch[1]),
@@ -1855,7 +2098,7 @@
 
         if (!Number.isFinite(signalClose) || signalClose <= 0) continue;
 
-        entries.set(code, {
+        entries.push({
           name,
           code,
           signalClose,
@@ -1863,7 +2106,7 @@
         });
       }
 
-      return Array.from(entries.values());
+      return entries;
     }
 
     function parseDisplayLine(line) {
@@ -2816,7 +3059,7 @@
       });
     });
 
-    [operationDialog, rankingDialog, tradeDialog, profitDialog].forEach(bindDialogBehavior);
+    [operationDialog, allOperationsDialog, rankingDialog, tradeDialog, profitDialog].forEach(bindDialogBehavior);
 
     function handleTooltipEnter(event) {
       const trigger = closestTooltipTrigger(event.target);
@@ -2907,10 +3150,19 @@
         confirmAmount();
       }
     });
+    allOperationsConfirmBtn.addEventListener("click", renderAllOperations);
+    [allV4AmountInput, allV7AmountInput, allV8AmountInput].forEach(input => {
+      input.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          renderAllOperations();
+        }
+      });
+    });
 
     btnV7.addEventListener("click", () => { void switchStrategy("v7"); });
     btnV8.addEventListener("click", () => { void switchStrategy("v8"); });
     btnV4.addEventListener("click", () => { void switchStrategy("v4"); });
+    openAllOperationsBtn.addEventListener("click", openAllOperations);
     btnRefresh.addEventListener("click", () => { void refreshStrategies(); });
 
     openOperationBtn.addEventListener("click", () => { openDialog(operationDialog); });
