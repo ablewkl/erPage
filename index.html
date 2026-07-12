@@ -1696,11 +1696,12 @@
         return renderEmptyState(type === "buy" ? "暂无可执行的买入计划" : "暂无待卖出计划");
       }
       return groups.map(group => {
+        const orderPrices = [...new Set(group.legs.map(leg => formatNumber(leg.price, 3)))].join(" / ");
         const totals = type === "buy"
-          ? `<div class="chip-row"><span class="chip">计划金额 ${escapeHtml(formatNumber(group.requestedAmount, 2))}</span><span class="chip">预计金额 ${escapeHtml(formatNumber(group.estimatedCost, 2))}</span><span class="chip">合计 ${escapeHtml(formatShares(group.shares))} 份</span></div>`
+          ? `<div class="chip-row"><span class="chip">计划金额 ${escapeHtml(formatNumber(group.requestedAmount, 2))}</span><span class="chip">预计金额 ${escapeHtml(formatNumber(group.estimatedCost, 2))}</span><span class="chip">合计 ${escapeHtml(formatShares(group.shares))} 份</span><span class="chip">挂单价 ${escapeHtml(orderPrices)}</span></div>`
           : `<div class="chip-row"><span class="chip">合计 ${escapeHtml(formatShares(group.shares))} 份</span></div>`;
         const details = group.legs.map(leg => type === "buy"
-          ? `${leg.strategy.toUpperCase()}：金额 ${formatNumber(leg.amount, 2)}，${formatShares(leg.shares)} 份，挂单价 ${formatNumber(leg.price, 3)}`
+          ? `${leg.strategy.toUpperCase()}：金额 ${formatNumber(leg.amount, 2)}，${formatShares(leg.shares)} 份`
           : `${leg.strategy.toUpperCase()}：${formatShares(leg.shares)} 份`
         );
         return `
