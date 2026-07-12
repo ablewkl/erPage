@@ -2080,16 +2080,17 @@
         const name = baseMatch[1];
         const code = baseMatch[2];
         if (currentStrategy === "v4") {
+          const orderPriceMatch = line.match(/挂单价:\s*([0-9.]+)/);
           const planPrice = closeMap.get(code);
           if (!Number.isFinite(planPrice) || planPrice <= 0) continue;
           entries.push({
             name,
             code,
             signalClose: planPrice,
-            orderPrice: null,
+            orderPrice: orderPriceMatch ? Number(orderPriceMatch[1]) : null,
             // V4 buys at the next open, which is unknown at planning time.
             // Use the signal-day close solely to estimate an order size.
-            priceLabel: "预估开盘价（信号日收盘）"
+            priceLabel: orderPriceMatch ? "挂单价" : "预估开盘价（信号日收盘）"
           });
           continue;
         }
