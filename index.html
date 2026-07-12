@@ -1333,6 +1333,7 @@
     const pageTooltipEl = document.getElementById("conditionTooltip");
 
     const AMOUNT_STORAGE_KEY = "etf_strategy_amount_v1";
+    const ALL_OPERATION_AMOUNTS_STORAGE_KEY = "etf_strategy_all_operation_amounts_v1";
     const STRATEGY_BUNDLE_STORAGE_KEY = "etf_strategy_bundle_v5";
     const ORDER_PRICE_MULTIPLIER = 1.04;
     const DEMO_BUNDLE_URL = pageParams.get("demoBundle") || (pageParams.get("demo") === "1" ? "./demo/etf_strategy_bundle_latest.json" : "");
@@ -1631,6 +1632,25 @@
       };
     }
 
+    function saveAllOperationAmounts() {
+      safeStorageSet(ALL_OPERATION_AMOUNTS_STORAGE_KEY, JSON.stringify({
+        v4: allV4AmountInput.value.trim(),
+        v7: allV7AmountInput.value.trim(),
+        v8: allV8AmountInput.value.trim()
+      }));
+    }
+
+    function restoreAllOperationAmounts() {
+      try {
+        const saved = JSON.parse(safeStorageGet(ALL_OPERATION_AMOUNTS_STORAGE_KEY) || "{}");
+        allV4AmountInput.value = typeof saved.v4 === "string" ? saved.v4 : "";
+        allV7AmountInput.value = typeof saved.v7 === "string" ? saved.v7 : "";
+        allV8AmountInput.value = typeof saved.v8 === "string" ? saved.v8 : "";
+      } catch {
+        // Ignore malformed local data and leave all operation amounts blank.
+      }
+    }
+
     function parseSellPlanEntries(strategy, parsed) {
       const entries = [];
       for (const line of parsed.sellPlans || []) {
@@ -1680,7 +1700,7 @@
           ? `<div class="chip-row"><span class="chip">计划金额 ${escapeHtml(formatNumber(group.requestedAmount, 2))}</span><span class="chip">预计金额 ${escapeHtml(formatNumber(group.estimatedCost, 2))}</span><span class="chip">合计 ${escapeHtml(formatShares(group.shares))} 份</span></div>`
           : `<div class="chip-row"><span class="chip">合计 ${escapeHtml(formatShares(group.shares))} 份</span></div>`;
         const details = group.legs.map(leg => type === "buy"
-          ? `${leg.strategy.toUpperCase()}：金额 ${formatNumber(leg.amount, 2)}，${leg.priceLabel} ${formatNumber(leg.price, 3)}，${formatShares(leg.shares)} 份`
+          ? `${leg.strategy.toUpperCase()}：金额 ${formatNumber(leg.amount, 2)}，${formatShares(leg.shares)} 份，挂单价 ${formatNumber(leg.price, 3)}`
           : `${leg.strategy.toUpperCase()}：${formatShares(leg.shares)} 份`
         );
         return `
@@ -1711,18 +1731,18 @@
         const parsed = buildParsedPayloadForStrategy(strategy, strategyPayloadMap[strategy]);
 
         for (const entry of parsed.sizingEntries) {
-          const price = Number(entry.orderPrice || entry.signalClose);
-          const shares = floorToHundreds(amount / price);
+          const signalClose = Number(entry.signalClose);
+          const orderPrice = Number(entry.orderPrice || signalClose);
+          const shares = floorToHundreds(amount / signalClose);
           if (!shares) continue;
           buyLegs.push({
             strategy,
             name: entry.name,
             code: entry.code,
             amount,
-            price,
-            priceLabel: entry.orderPrice ? "挂单价" : (entry.priceLabel || "计划买入价"),
+            price: orderPrice,
             shares,
-            estimatedCost: shares * price
+            estimatedCost: shares * orderPrice
           });
         }
 
@@ -3058,6 +3078,7 @@
     }
 
     capitalInput.value = safeStorageGet(AMOUNT_STORAGE_KEY) || (DEMO_MODE ? DEMO_AMOUNT : "");
+    restoreAllOperationAmounts();
 
     document.querySelectorAll("[data-close-dialog]").forEach(button => {
       button.addEventListener("click", event => {
@@ -3158,6 +3179,7 @@
     });
     allOperationsConfirmBtn.addEventListener("click", renderAllOperations);
     [allV4AmountInput, allV7AmountInput, allV8AmountInput].forEach(input => {
+      input.addEventListener("input", saveAllOperationAmounts);
       input.addEventListener("keydown", event => {
         if (event.key === "Enter") {
           renderAllOperations();
