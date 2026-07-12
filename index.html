@@ -1333,7 +1333,8 @@
     const pageTooltipEl = document.getElementById("conditionTooltip");
 
     const AMOUNT_STORAGE_KEY = "etf_strategy_amount_v1";
-    const STRATEGY_BUNDLE_STORAGE_KEY = "etf_strategy_bundle_v4";
+    const STRATEGY_BUNDLE_STORAGE_KEY = "etf_strategy_bundle_v5";
+    const ORDER_PRICE_MULTIPLIER = 1.04;
     const DEMO_BUNDLE_URL = pageParams.get("demoBundle") || (pageParams.get("demo") === "1" ? "./demo/etf_strategy_bundle_latest.json" : "");
     const DEMO_MODE = Boolean(DEMO_BUNDLE_URL);
     const DEMO_AMOUNT = pageParams.get("amount") || "20000";
@@ -2071,6 +2072,10 @@
       const entries = [];
       const buyLines = sections["买入计划"] || [];
 
+      function orderPriceFromSignalClose(signalClose) {
+        return Number((signalClose * ORDER_PRICE_MULTIPLIER).toFixed(3));
+      }
+
       for (const line of buyLines) {
         if (line === "无") continue;
         if (line.startsWith("卖出前持仓数:")) continue;
@@ -2080,22 +2085,18 @@
         const name = baseMatch[1];
         const code = baseMatch[2];
         if (currentStrategy === "v4") {
-          const orderPriceMatch = line.match(/挂单价:\s*([0-9.]+)/);
           const planPrice = closeMap.get(code);
           if (!Number.isFinite(planPrice) || planPrice <= 0) continue;
           entries.push({
             name,
             code,
             signalClose: planPrice,
-            orderPrice: orderPriceMatch ? Number(orderPriceMatch[1]) : null,
-            // V4 buys at the next open, which is unknown at planning time.
-            // Use the signal-day close solely to estimate an order size.
-            priceLabel: orderPriceMatch ? "挂单价" : "预估开盘价（信号日收盘）"
+            orderPrice: orderPriceFromSignalClose(planPrice),
+            priceLabel: "挂单价"
           });
           continue;
         }
         const signalCloseMatch = line.match(/信号日收盘:([0-9.]+)/);
-        const orderPriceMatch = line.match(/(?:挂单价:|计划下一交易日挂单\s*)([0-9.]+)/);
         const signalClose = signalCloseMatch
           ? Number(signalCloseMatch[1])
           : closeMap.get(code) ?? NaN;
@@ -2106,7 +2107,8 @@
           name,
           code,
           signalClose,
-          orderPrice: orderPriceMatch ? Number(orderPriceMatch[1]) : null
+          orderPrice: orderPriceFromSignalClose(signalClose),
+          priceLabel: "挂单价"
         });
       }
 
