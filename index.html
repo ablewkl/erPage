@@ -1661,11 +1661,14 @@
         if (!buyPriceMatch) continue;
         const buyPrice = Number(buyPriceMatch[1]);
         if (!Number.isFinite(buyPrice) || buyPrice <= 0) continue;
+        const signalCloseMatch = String(line).match(/信号日收盘:([0-9.]+)/);
+        const signalClose = signalCloseMatch ? Number(signalCloseMatch[1]) : buyPrice;
+        if (!Number.isFinite(signalClose) || signalClose <= 0) continue;
         entries.push({
           strategy,
           name: etfMatch[1].trim(),
           code: etfMatch[2],
-          buyPrice
+          signalClose
         });
       }
       return entries;
@@ -1748,7 +1751,7 @@
         }
 
         for (const entry of parseSellPlanEntries(strategy, parsed)) {
-          const shares = floorToHundreds(amount / entry.buyPrice);
+          const shares = floorToHundreds(amount / entry.signalClose);
           if (!shares) continue;
           sellLegs.push({
             ...entry,
@@ -2233,7 +2236,7 @@
       };
       const v4BuyCodes = new Set(
         (sections["买入计划"] || [])
-          .filter(line => line.includes("买入价:"))
+          .filter(line => /(?:挂单价|买入价)/.test(line))
           .map(line => line.match(/\((S[HZ]\d+)\)/)?.[1])
           .filter(Boolean)
       );
