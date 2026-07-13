@@ -1662,14 +1662,11 @@
         if (!buyPriceMatch) continue;
         const buyPrice = Number(buyPriceMatch[1]);
         if (!Number.isFinite(buyPrice) || buyPrice <= 0) continue;
-        const signalCloseMatch = String(line).match(/信号日收盘:([0-9.]+)/);
-        const signalClose = signalCloseMatch ? Number(signalCloseMatch[1]) : buyPrice;
-        if (!Number.isFinite(signalClose) || signalClose <= 0) continue;
         entries.push({
           strategy,
           name: etfMatch[1].trim(),
           code: etfMatch[2],
-          signalClose
+          buyPrice
         });
       }
       return entries;
@@ -1782,7 +1779,7 @@
         }
 
         for (const entry of parseSellPlanEntries(strategy, parsed)) {
-          const shares = floorToHundreds(amount / entry.signalClose);
+          const shares = floorToHundreds(amount / entry.buyPrice);
           if (!shares) continue;
           sellLegs.push({
             ...entry,
