@@ -1383,6 +1383,8 @@
     let currentSplitMap = {};
     let currentSplitRequestId = 0;
     let allOperationSplitRequestId = 0;
+    let allOperationSignalCloseMap = {};
+    let allOperationSignalCloseRequestId = 0;
     let activeTooltipTrigger = null;
     let activeTooltipPinned = false;
     let activeTooltipEl = pageTooltipEl;
@@ -1607,6 +1609,7 @@
     function clearStrategyPayloads() {
       strategyPayloadMap = { v7: null, v8: null, v4: null };
       currentSplitMap = {};
+      allOperationSignalCloseMap = {};
       currentSplitRequestId += 1;
     }
 
@@ -1654,6 +1657,15 @@
 
     function parseSellPlanEntries(strategy, parsed) {
       const entries = [];
+      const holdSignalDates = new Map();
+      for (const holdLine of parsed.holds || []) {
+        const code = String(holdLine).match(/\((S[HZ]\d+)\)/)?.[1];
+        const signalDate = String(holdLine).match(/信号日:(\d{4}-\d{2}-\d{2})/)?.[1];
+        if (!code || !signalDate) continue;
+        const dates = holdSignalDates.get(code) || [];
+        dates.push(signalDate);
+        holdSignalDates.set(code, dates);
+      }
       for (const line of parsed.sellPlans || []) {
         const etfMatch = String(line).match(/(?:^|\|\s*)([^|()]+?)\((S[HZ]\d+)\)/);
         if (!etfMatch) continue;
@@ -1662,14 +1674,49 @@
         if (!buyPriceMatch) continue;
         const buyPrice = Number(buyPriceMatch[1]);
         if (!Number.isFinite(buyPrice) || buyPrice <= 0) continue;
+        const code = etfMatch[2];
+        const signalDate = String(line).match(/信号日:(\d{4}-\d{2}-\d{2})/)?.[1]
+          || holdSignalDates.get(code)?.shift()
+          || "";
         entries.push({
           strategy,
           name: etfMatch[1].trim(),
-          code: etfMatch[2],
-          buyPrice
+          code,
+          buyPrice,
+          signalDate
         });
       }
       return entries;
+    }
+
+    function allOperationSignalCloseRequests() {
+      const requests = [];
+      for (const strategy of ["v4", "v7", "v8"]) {
+        const payload = strategyPayloadMap[strategy];
+        if (!payload) continue;
+        const parsed = buildParsedPayloadForStrategy(strategy, payload);
+        for (const entry of parseSellPlanEntries(strategy, parsed)) {
+          if (entry.signalDate) requests.push(`${entry.code}@${entry.signalDate}`);
+        }
+      }
+      return Array.from(new Set(requests));
+    }
+
+    async function refreshAllOperationSignalCloses() {
+      const items = allOperationSignalCloseRequests();
+      const requestId = ++allOperationSignalCloseRequestId;
+      if (!items.length || !currentPassword.trim() || DEMO_MODE) return;
+
+      try {
+        const payload = await fetchJson(buildApiUrl("/api/fund/signal-closes", {
+          items: items.join(",")
+        }));
+        if (requestId !== allOperationSignalCloseRequestId) return;
+        allOperationSignalCloseMap = { ...allOperationSignalCloseMap, ...(payload.items || {}) };
+        if (allOperationsDialog.open) renderAllOperations();
+      } catch {
+        // Sell quantities stay unavailable rather than falling back to actual buy prices.
+      }
     }
 
     function allOperationSplitCodes() {
@@ -1779,7 +1826,8 @@
         }
 
         for (const entry of parseSellPlanEntries(strategy, parsed)) {
-          const shares = floorToHundreds(amount / entry.buyPrice);
+          const signalClose = Number(allOperationSignalCloseMap[`${entry.code}@${entry.signalDate}`]);
+          const shares = floorToHundreds(amount / signalClose);
           if (!shares) continue;
           sellLegs.push({
             ...entry,
@@ -1816,6 +1864,7 @@
       allOperationsDialog.showModal();
       renderAllOperations();
       void refreshAllOperationSplitMap();
+      void refreshAllOperationSignalCloses();
     }
 
     function defaultScoreFormula(strategy) {
