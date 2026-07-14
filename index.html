@@ -370,6 +370,18 @@
       cursor: default;
     }
 
+    .flag-chip.ok {
+      background: var(--ok-soft);
+      color: var(--ok);
+      border-color: rgba(21, 128, 61, 0.16);
+    }
+
+    .flag-chip.bad {
+      background: var(--danger-soft);
+      color: var(--danger);
+      border-color: rgba(194, 65, 12, 0.16);
+    }
+
     .result-chip.ok {
       background: var(--ok-soft);
       color: var(--ok);
@@ -995,7 +1007,7 @@
             <div class="tile-top">
               <div>
                 <div class="tile-title">最新排名</div>
-                <div class="tile-copy">查看最新交易日 score 排行，只保留 10chg、50chg、last1chg，并显示买入条件、过滤条件和最终通过结果。</div>
+                <div class="tile-copy">查看最新交易日 score 排行、完整买入条件、过滤条件和最终通过结果。</div>
               </div>
               <div class="tile-arrow" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
@@ -1074,6 +1086,7 @@
             <input id="capitalInput" class="capital" type="text" inputmode="decimal" placeholder="当前金额，例如 20000" />
             <button id="amountConfirmBtn" class="dialog-btn" type="button">确认金额</button>
           </div>
+          <div id="sizingCompound" class="sizing-metrics"></div>
           <div id="sizingList" class="card-list"></div>
         </section>
 
@@ -1151,7 +1164,7 @@
       <div class="dialog-head">
         <div>
           <h3>最新交易日排行</h3>
-          <p id="rankingDialogNote">score 排行只保留 10chg、50chg、last1chg，并根据最新文本结果显示买入条件、过滤条件和通过状态。</p>
+          <p id="rankingDialogNote">score 排行显示 10chg、50chg、完整买入条件、过滤条件和通过状态。</p>
         </div>
         <button class="dialog-close" data-close-dialog="rankingDialog" type="button">×</button>
       </div>
@@ -1169,7 +1182,6 @@
                   <th>Score</th>
                   <th>10chg</th>
                   <th>50chg</th>
-                  <th>last1chg</th>
                   <th>买入条件</th>
                   <th>过滤</th>
                   <th>结果</th>
@@ -1297,6 +1309,7 @@
     const capitalInput = document.getElementById("capitalInput");
     const amountConfirmBtn = document.getElementById("amountConfirmBtn");
     const sizingListEl = document.getElementById("sizingList");
+    const sizingCompoundEl = document.getElementById("sizingCompound");
     const buyPlanListEl = document.getElementById("buyPlanList");
     const holdListEl = document.getElementById("holdList");
     const sellPlanListEl = document.getElementById("sellPlanList");
@@ -2096,15 +2109,26 @@
       return String(item.split_date).trim() || "无";
     }
 
+    function formatRecentSplitRatio(item) {
+      const ratio = Number(item?.split_ratio);
+      if (!item || !item.has_recent_split || !Number.isFinite(ratio) || ratio <= 0) {
+        return "无";
+      }
+      return formatNumber(ratio, 4);
+    }
+
     async function refreshRecentSplitMap(parsed) {
       const sizingEntries = parsed?.sizingEntries || [];
-      const codes = Array.from(new Set(sizingEntries.map(item => item.code).filter(Boolean)));
+      const planCodes = [...(parsed?.buyPlans || []), ...(parsed?.sellPlans || [])]
+        .map(line => String(line).match(/\((S[HZ]\d+)\)/)?.[1])
+        .filter(Boolean);
+      const codes = Array.from(new Set([...sizingEntries.map(item => item.code), ...planCodes].filter(Boolean)));
       const requestId = ++currentSplitRequestId;
 
       if (!codes.length || !currentPassword.trim() || DEMO_MODE) {
         currentSplitMap = {};
         if (parsed === currentParsed) {
-          renderSizingFromParsed(parsed);
+          renderDialogs(parsed);
         }
         return;
       }
@@ -2112,7 +2136,7 @@
       try {
         const payload = await fetchJson(buildApiUrl("/api/fund/splits", {
           codes: codes.join(","),
-          recent_days: 7
+          recent_days: 3650
         }));
         if (requestId !== currentSplitRequestId) {
           return;
@@ -2126,7 +2150,7 @@
       }
 
       if (parsed === currentParsed) {
-        renderSizingFromParsed(parsed);
+        renderDialogs(parsed);
       }
     }
 
@@ -2246,7 +2270,7 @@
       return `<div class="empty">${escapeHtml(message)}</div>`;
     }
 
-    function renderRecordCards(lines, emptyText = "暂无数据") {
+    function renderRecordCards(lines, emptyText = "暂无数据", options = {}) {
       const cleaned = (lines || []).filter(line => line && line !== "无");
       if (!cleaned.length) {
         return renderEmptyState(emptyText);
@@ -2255,12 +2279,16 @@
       return cleaned.map(line => {
         const parsed = parseDisplayLine(line);
         if (!parsed) return "";
+        const code = String(line).match(/\((S[HZ]\d+)\)/)?.[1];
+        const title = options.showSplitRatio && code
+          ? `${parsed.title} | 最近拆分份额: ${formatRecentSplitRatio(currentSplitMap[code])}`
+          : parsed.title;
         const chips = parsed.segments.length
           ? `<div class="chip-row">${parsed.segments.map(segment => `<span class="chip">${escapeHtml(segment)}</span>`).join("")}</div>`
           : "";
         return `
           <article class="record-card">
-            <div class="record-title">${escapeHtml(parsed.title)}</div>
+            <div class="record-title">${escapeHtml(title)}</div>
             ${chips || `<div class="record-copy">${escapeHtml(line)}</div>`}
           </article>
         `;
@@ -2274,11 +2302,13 @@
         if (!matched) continue;
 
         const code = matched[3];
-        const conditions = [];
-        if (matched[6] === "Y") conditions.push({ label: "条件1", reason: buyRuleMap["1"] || "基础候选池" });
-        if (matched[7] === "Y") conditions.push({ label: "条件2", reason: buyRuleMap["2"] || "score 排名" });
-        if (matched[8] === "Y") conditions.push({ label: "条件3", reason: buyRuleMap["3"] || "分数条件" });
-        if (matched[9] === "Y") conditions.push({ label: "条件4", reason: buyRuleMap["4"] || "红K 竞争信号" });
+        const conditions = [
+          { label: "条件1", reason: buyRuleMap["1"] || "基础候选池", passed: matched[6] === "Y" },
+          { label: "条件2", reason: buyRuleMap["2"] || "score 排名", passed: matched[7] === "Y" },
+          { label: "条件3", reason: buyRuleMap["3"] || "分数条件", passed: matched[8] === "Y" },
+          { label: "条件4", reason: buyRuleMap["4"] || "红K 竞争信号", passed: matched[9] === "Y" },
+          { label: "条件5", reason: buyRuleMap["5"] || "当日候选入选", passed: matched[10] === "Y" }
+        ];
 
         const filters = [];
         if (matched[11] === "Y") filters.push({ label: "过滤1", reason: filterRuleMap["1"] || "排名过滤" });
@@ -2379,21 +2409,13 @@
           const selected = v4BuyCodes.has(code);
 
           if (rank <= 4) {
-            conditions.push({ label: "前4", reason: "V4 只从最新 score 排名前 4 的 ETF 中选择候选。" });
+            conditions.push({ label: "前4", reason: "V4 只从最新 score 排名前 4 的 ETF 中选择候选。", passed: true });
           } else {
-            filters.push({ label: "排名", reason: "未进入 V4 前 4 候选。" });
+            conditions.push({ label: "前4", reason: "V4 只从最新 score 排名前 4 的 ETF 中选择候选。", passed: false });
           }
-          if (Number.isFinite(time60) && time60 >= -0.028723) {
-            conditions.push({ label: "60日", reason: "time60 达到 V4 基础阈值。" });
-          } else {
-            filters.push({ label: "60日", reason: "time60 未达到 V4 基础阈值。" });
-          }
-          if (open > close) {
-            conditions.push({ label: "阴线", reason: "当日开盘价高于收盘价。" });
-          }
-          if (percent < 0) {
-            conditions.push({ label: "收跌", reason: "当日涨跌幅为负。" });
-          }
+          conditions.push({ label: "60日", reason: "time60 达到 V4 基础阈值。", passed: Number.isFinite(time60) && time60 >= -0.028723 });
+          conditions.push({ label: "阴线", reason: "当日开盘价高于收盘价。", passed: open > close });
+          conditions.push({ label: "收跌", reason: "当日涨跌幅为负。", passed: percent < 0 });
 
           rows.push({
             rank,
@@ -2430,18 +2452,10 @@
 
         const conditions = [];
         const time60Ok = Number.isFinite(time60) && time60 >= -0.06;
-        if (time60Ok && chg50 > -0.05 && chg10 < -0.1 && rank < 8) {
-          conditions.push({ label: "条件1", reason: `${v8ConditionReasonMap["1"]}；且 ${v8BaseReason}` });
-        }
-        if (time60Ok && diff < -0.001 && rank < 3) {
-          conditions.push({ label: "条件2", reason: `${v8ConditionReasonMap["2"]}；且 ${v8BaseReason}` });
-        }
-        if (time60Ok && percent < -2 && rank < 6) {
-          conditions.push({ label: "条件3", reason: `${v8ConditionReasonMap["3"]}；且 ${v8BaseReason}` });
-        }
-        if (time60Ok && chg50 > -0.05 && diff < -0.001 && rank < 3) {
-          conditions.push({ label: "条件4", reason: `${v8ConditionReasonMap["4"]}；且 ${v8BaseReason}` });
-        }
+        conditions.push({ label: "条件1", reason: `${v8ConditionReasonMap["1"]}；且 ${v8BaseReason}`, passed: time60Ok && chg50 > -0.05 && chg10 < -0.1 && rank < 8 });
+        conditions.push({ label: "条件2", reason: `${v8ConditionReasonMap["2"]}；且 ${v8BaseReason}`, passed: time60Ok && diff < -0.001 && rank < 3 });
+        conditions.push({ label: "条件3", reason: `${v8ConditionReasonMap["3"]}；且 ${v8BaseReason}`, passed: time60Ok && percent < -2 && rank < 6 });
+        conditions.push({ label: "条件4", reason: `${v8ConditionReasonMap["4"]}；且 ${v8BaseReason}`, passed: time60Ok && chg50 > -0.05 && diff < -0.001 && rank < 3 });
 
         const filters = [];
         if (Number.isFinite(time60) && time60 < -0.06) {
@@ -2461,7 +2475,7 @@
           last1,
           conditions,
           filters,
-          pass: conditions.length > 0 && filters.length === 0,
+          pass: conditions.some(item => item.passed) && filters.length === 0,
           note: filters.some(item => item.label === "过滤2") ? "" : "",
           open,
           close,
@@ -2693,9 +2707,16 @@
       return items.map(item => renderTooltipChip(item.label, item.reason)).join("");
     }
 
+    function renderConditionList(items) {
+      if (!items || !items.length) {
+        return '<span class="flag-chip empty">无</span>';
+      }
+      return items.map(item => renderTooltipChip(item.label, item.reason, item.passed ? "flag-chip ok" : "flag-chip bad")).join("");
+    }
+
     function renderRankingTable(rows) {
       if (!rows.length) {
-        rankingTableBodyEl.innerHTML = `<tr><td colspan="9">${renderEmptyState("暂无排行数据")}</td></tr>`;
+        rankingTableBodyEl.innerHTML = `<tr><td colspan="8">${renderEmptyState("暂无排行数据")}</td></tr>`;
         return;
       }
 
@@ -2709,8 +2730,7 @@
           <td class="mono">${escapeHtml(formatNumber(row.score, 4))}</td>
           <td class="mono">${escapeHtml(formatNumber(row.chg10, 4))}</td>
           <td class="mono">${escapeHtml(formatNumber(row.chg50, 4))}</td>
-          <td class="mono">${escapeHtml(formatNumber(row.last1, 4))}</td>
-          <td>${renderFlagList(row.conditions)}</td>
+          <td>${renderConditionList(row.conditions)}</td>
           <td>${renderFlagList(row.filters)}</td>
           <td>${row.pass ? '<span class="result-chip ok">√</span>' : renderTooltipChip("×", row.note || "买入条件不完整或存在过滤条件", "result-chip bad")}</td>
         </tr>
@@ -2791,22 +2811,26 @@
 
     function renderSizingFromParsed(parsed) {
       if (!parsed) {
+        sizingCompoundEl.innerHTML = "";
         sizingListEl.innerHTML = renderEmptyState("请先获取策略结果。");
         return;
       }
 
       const amount = parseLooseNumber(capitalInput.value);
       if (!Number.isFinite(amount) || amount <= 0) {
+        sizingCompoundEl.innerHTML = "";
         sizingListEl.innerHTML = renderEmptyState("请输入当前金额后再确认。");
         return;
       }
 
       if (!parsed.sizingEntries.length) {
+        sizingCompoundEl.innerHTML = "";
         sizingListEl.innerHTML = renderEmptyState("当前买入计划里没有可估算的信号。");
         return;
       }
 
       const compoundMultiplier = formatCompoundMultiplier(parsed.summaryInfo?.summary?.latestAccount);
+      sizingCompoundEl.innerHTML = `<span class="sizing-metric"><span>复利倍数</span><strong>${escapeHtml(compoundMultiplier)}</strong></span>`;
       sizingListEl.innerHTML = parsed.sizingEntries.map(item => {
         const shares = roundToHundreds(amount / item.signalClose);
         const metrics = [
@@ -2815,7 +2839,6 @@
         if (item.orderPrice && Number.isFinite(item.orderPrice)) {
           metrics.push(`<span class="sizing-metric"><span>挂单价</span><strong>${escapeHtml(formatNumber(item.orderPrice, 3))}</strong></span>`);
         }
-        metrics.push(`<span class="sizing-metric"><span>复利倍数</span><strong>${escapeHtml(compoundMultiplier)}</strong></span>`);
         metrics.push(`<span class="sizing-metric"><span>最近拆分日期</span><strong>${escapeHtml(formatRecentSplitDate(currentSplitMap[item.code]))}</strong></span>`);
         return `
           <article class="record-card sizing-card">
@@ -2836,9 +2859,9 @@
       const sellCount = countMeaningfulLines(parsed.sellPlans);
 
       operationDialogNoteEl.textContent = `买入计划:${formatCountLabel(buyCount)}，当前持仓:${formatCountLabel(holdCount)}，卖出计划:${formatCountLabel(sellCount)}`;
-      buyPlanListEl.innerHTML = renderRecordCards(filterMeaningfulLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" }), "暂无买入计划");
+      buyPlanListEl.innerHTML = renderRecordCards(filterMeaningfulLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" }), "暂无买入计划", { showSplitRatio: true });
       holdListEl.innerHTML = renderRecordCards(parsed.holds, "暂无当前持仓");
-      sellPlanListEl.innerHTML = renderRecordCards(buildV7SellPlanDisplayLines(parsed), "暂无卖出计划");
+      sellPlanListEl.innerHTML = renderRecordCards(buildV7SellPlanDisplayLines(parsed), "暂无卖出计划", { showSplitRatio: true });
       renderSizingFromParsed(parsed);
 
       rankingDialogNoteEl.textContent = `${extractHeadlineValue(summary.latestTrade || "最新交易日: -")} | ${currentStrategy.toUpperCase()} 最新 score 排行。`;
@@ -2914,6 +2937,7 @@
       heroSummaryEl.innerHTML = `最新交易日: -&nbsp;&nbsp;结果来源: - | <span class="cache-highlight">最后缓存时间: -</span>`;
       panelNoteEl.textContent = message;
       updateActionTiles(null);
+      sizingCompoundEl.innerHTML = "";
       renderSizingFromParsed(null);
       buyPlanListEl.innerHTML = renderEmptyState("暂无买入计划");
       holdListEl.innerHTML = renderEmptyState("暂无当前持仓");
