@@ -2823,21 +2823,20 @@
         return;
       }
 
+      const compoundMultiplier = formatCompoundMultiplier(parsed.summaryInfo?.summary?.latestAccount);
+      sizingCompoundEl.innerHTML = `<span class="sizing-metric"><span>复利倍数</span><strong>${escapeHtml(compoundMultiplier)}</strong></span>`;
+
       const amount = parseLooseNumber(capitalInput.value);
       if (!Number.isFinite(amount) || amount <= 0) {
-        sizingCompoundEl.innerHTML = "";
         sizingListEl.innerHTML = renderEmptyState("请输入当前金额后再确认。");
         return;
       }
 
       if (!parsed.sizingEntries.length) {
-        sizingCompoundEl.innerHTML = "";
         sizingListEl.innerHTML = renderEmptyState("当前买入计划里没有可估算的信号。");
         return;
       }
 
-      const compoundMultiplier = formatCompoundMultiplier(parsed.summaryInfo?.summary?.latestAccount);
-      sizingCompoundEl.innerHTML = "";
       sizingListEl.innerHTML = parsed.sizingEntries.map(item => {
         const shares = roundToHundreds(amount / item.signalClose);
         const metrics = [
