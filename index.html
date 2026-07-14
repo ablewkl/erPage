@@ -1173,6 +1173,7 @@
           <h4>最新排名</h4>
           <p class="section-note" id="rankingFormula">Score公式: -</p>
           <p class="section-note" id="rankingHint">无</p>
+          <div id="rankingBuyRules" class="chip-row"></div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -1325,6 +1326,7 @@
     const rankingDialogNoteEl = document.getElementById("rankingDialogNote");
     const rankingFormulaEl = document.getElementById("rankingFormula");
     const rankingHintEl = document.getElementById("rankingHint");
+    const rankingBuyRulesEl = document.getElementById("rankingBuyRules");
     const rankingTableBodyEl = document.getElementById("rankingTableBody");
 
     const tradeDialogNoteEl = document.getElementById("tradeDialogNote");
@@ -2117,6 +2119,11 @@
       return formatNumber(ratio, 4);
     }
 
+    function formatRecentSplitInfo(item) {
+      if (!item || !item.has_recent_split) return "无";
+      return `日期 ${formatRecentSplitDate(item)}，份额 ${formatRecentSplitRatio(item)}`;
+    }
+
     async function refreshRecentSplitMap(parsed) {
       const sizingEntries = parsed?.sizingEntries || [];
       const planCodes = [...(parsed?.buyPlans || []), ...(parsed?.sellPlans || [])]
@@ -2281,7 +2288,7 @@
         if (!parsed) return "";
         const code = String(line).match(/\((S[HZ]\d+)\)/)?.[1];
         const title = options.showSplitRatio && code
-          ? `${parsed.title} | 最近拆分份额: ${formatRecentSplitRatio(currentSplitMap[code])}`
+          ? `${parsed.title} | 最近拆分: ${formatRecentSplitInfo(currentSplitMap[code])}`
           : parsed.title;
         const chips = parsed.segments.length
           ? `<div class="chip-row">${parsed.segments.map(segment => `<span class="chip">${escapeHtml(segment)}</span>`).join("")}</div>`
@@ -2830,7 +2837,7 @@
       }
 
       const compoundMultiplier = formatCompoundMultiplier(parsed.summaryInfo?.summary?.latestAccount);
-      sizingCompoundEl.innerHTML = `<span class="sizing-metric"><span>复利倍数</span><strong>${escapeHtml(compoundMultiplier)}</strong></span>`;
+      sizingCompoundEl.innerHTML = "";
       sizingListEl.innerHTML = parsed.sizingEntries.map(item => {
         const shares = roundToHundreds(amount / item.signalClose);
         const metrics = [
@@ -2839,6 +2846,7 @@
         if (item.orderPrice && Number.isFinite(item.orderPrice)) {
           metrics.push(`<span class="sizing-metric"><span>挂单价</span><strong>${escapeHtml(formatNumber(item.orderPrice, 3))}</strong></span>`);
         }
+        metrics.push(`<span class="sizing-metric"><span>复利倍数</span><strong>${escapeHtml(compoundMultiplier)}</strong></span>`);
         metrics.push(`<span class="sizing-metric"><span>最近拆分日期</span><strong>${escapeHtml(formatRecentSplitDate(currentSplitMap[item.code]))}</strong></span>`);
         return `
           <article class="record-card sizing-card">
@@ -2866,8 +2874,12 @@
 
       rankingDialogNoteEl.textContent = `${extractHeadlineValue(summary.latestTrade || "最新交易日: -")} | ${currentStrategy.toUpperCase()} 最新 score 排行。`;
       rankingFormulaEl.textContent = summary.scoreFormula || `score公式: ${defaultScoreFormula(currentStrategy)}`;
+      const buyRules = parseRuleMap(parsed.sections["买入条件"] || []);
+      rankingBuyRulesEl.innerHTML = Object.entries(buyRules).length
+        ? Object.entries(buyRules).map(([number, rule]) => `<span class="chip">条件${escapeHtml(number)}: ${escapeHtml(rule)}</span>`).join("")
+        : '<span class="chip">暂无买入条件文本</span>';
       rankingHintEl.textContent = currentStrategy === "v7"
-        ? "V7 的“新增信号详细”只覆盖前 4 名，所以完整买入/过滤判断以这 4 名为准，其余行仅保留排行指标。"
+        ? "V7 完整排名均输出条件状态；标签绿色表示通过，红色表示不通过。"
         : currentStrategy === "v4"
           ? "V4 的原始结果不单列完整条件编号，主页面按最新买入计划、排名和 time60 展示可还原的观察条件。"
           : "V8 的买入条件按 step1~step4 显示；过滤条件按最新文本可还原的规则展示。";
@@ -2943,7 +2955,8 @@
       holdListEl.innerHTML = renderEmptyState("暂无当前持仓");
       sellPlanListEl.innerHTML = renderEmptyState("暂无卖出计划");
       rankingFormulaEl.textContent = "Score公式: -";
-      rankingTableBodyEl.innerHTML = `<tr><td colspan="9">${renderEmptyState("暂无排行数据")}</td></tr>`;
+      rankingBuyRulesEl.innerHTML = "";
+      rankingTableBodyEl.innerHTML = `<tr><td colspan="8">${renderEmptyState("暂无排行数据")}</td></tr>`;
       tradeTableBodyEl.innerHTML = `<tr><td colspan="9">${renderEmptyState("暂无最近交易数据")}</td></tr>`;
       profitCardsEl.innerHTML = renderEmptyState("暂无收益数据");
       yearlyTitleEl.textContent = "暂无年度收益";
