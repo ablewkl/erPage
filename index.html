@@ -2459,10 +2459,10 @@
 
         const conditions = [];
         const time60Ok = Number.isFinite(time60) && time60 >= -0.06;
-        conditions.push({ label: "条件1", reason: `${v8ConditionReasonMap["1"]}；且 ${v8BaseReason}`, passed: time60Ok && chg50 > -0.05 && chg10 < -0.1 && rank < 8 });
-        conditions.push({ label: "条件2", reason: `${v8ConditionReasonMap["2"]}；且 ${v8BaseReason}`, passed: time60Ok && diff < -0.001 && rank < 3 });
+        conditions.push({ label: "条件1", reason: `${v8ConditionReasonMap["1"]}；且 ${v8BaseReason}`, passed: time60Ok && chg50 > -0.05 && chg10 < -0.1 && rank <= 8 });
+        conditions.push({ label: "条件2", reason: `${v8ConditionReasonMap["2"]}；且 ${v8BaseReason}`, passed: time60Ok && diff < -0.001 && rank <= 3 });
         conditions.push({ label: "条件3", reason: `${v8ConditionReasonMap["3"]}；且 ${v8BaseReason}`, passed: time60Ok && percent < -2 && rank < 6 });
-        conditions.push({ label: "条件4", reason: `${v8ConditionReasonMap["4"]}；且 ${v8BaseReason}`, passed: time60Ok && chg50 > -0.05 && diff < -0.001 && rank < 3 });
+        conditions.push({ label: "条件4", reason: `${v8ConditionReasonMap["4"]}；且 ${v8BaseReason}`, passed: time60Ok && chg50 > -0.05 && diff < -0.001 && rank <= 3 });
 
         const filters = [];
         if (Number.isFinite(time60) && time60 < -0.06) {
