@@ -1123,6 +1123,7 @@
       <div class="dialog-body">
         <section class="dialog-section wide">
           <h4>策略金额</h4>
+          <div id="allStrategyCompoundMultipliers" class="all-operation-summary" aria-label="各策略复利倍数"></div>
           <p class="section-note">V4 和 V8 为 1/4 仓位，V7 为 1/2 仓位。输入金额直接用于每条对应策略计划的份额计算，不再按仓位比例换算。</p>
           <div class="all-operation-amounts">
             <div class="all-operation-field">
@@ -1320,6 +1321,7 @@
     const allV8AmountInput = document.getElementById("allV8Amount");
     const allOperationsConfirmBtn = document.getElementById("allOperationsConfirmBtn");
     const allOperationsSummaryEl = document.getElementById("allOperationsSummary");
+    const allStrategyCompoundMultipliersEl = document.getElementById("allStrategyCompoundMultipliers");
     const allBuyPlanListEl = document.getElementById("allBuyPlanList");
     const allSellPlanListEl = document.getElementById("allSellPlanList");
 
@@ -1807,9 +1809,20 @@
       }).join("");
     }
 
+    function renderAllStrategyCompoundMultipliers() {
+      const strategies = ["v4", "v7", "v8"];
+      allStrategyCompoundMultipliersEl.innerHTML = strategies.map(strategy => {
+        const payload = strategyPayloadMap[strategy];
+        const parsed = payload ? buildParsedPayloadForStrategy(strategy, payload) : null;
+        const multiplier = formatCompoundMultiplier(parsed?.summaryInfo?.summary?.latestAccount);
+        return `<span class="meta-pill">${strategy.toUpperCase()} 复利倍数 ${escapeHtml(multiplier)}</span>`;
+      }).join("");
+    }
+
     function renderAllOperations() {
       const amounts = allOperationAmounts();
       const strategies = ["v4", "v7", "v8"];
+      renderAllStrategyCompoundMultipliers();
       if (strategies.some(strategy => !strategyPayloadMap[strategy])) {
         allOperationsSummaryEl.innerHTML = '<span class="result-chip bad">请先获取 V4 / V7 / V8 最新数据</span>';
         allBuyPlanListEl.innerHTML = renderEmptyState("暂无完整策略结果");
