@@ -798,6 +798,63 @@
       line-height: 1.3;
     }
 
+    .return-chart {
+      min-height: 260px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fffdf9;
+    }
+
+    .return-chart-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .return-chart-head strong {
+      color: var(--accent-strong);
+      font-size: 14px;
+    }
+
+    .return-chart svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    .return-chart .chart-grid {
+      stroke: rgba(121, 91, 62, 0.16);
+      stroke-width: 1;
+    }
+
+    .return-chart .chart-zero {
+      stroke: rgba(182, 94, 56, 0.5);
+      stroke-width: 1.5;
+    }
+
+    .return-chart .chart-line {
+      fill: none;
+      stroke: var(--accent-strong);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .return-chart .chart-dot {
+      fill: #fffdf9;
+      stroke: var(--accent-strong);
+      stroke-width: 2;
+    }
+
+    .return-chart text {
+      fill: var(--muted);
+      font-size: 11px;
+    }
+
     .month-grid {
       display: grid;
       gap: 10px;
@@ -1174,6 +1231,7 @@
           <h4>最新排名</h4>
           <p class="section-note" id="rankingFormula">Score公式: -</p>
           <p class="section-note" id="rankingHint">无</p>
+          <div id="rankingReturnChart" class="return-chart"></div>
           <div id="rankingBuyRules" class="chip-row"></div>
           <div class="table-wrap">
             <table>
@@ -1328,6 +1386,7 @@
     const rankingDialogNoteEl = document.getElementById("rankingDialogNote");
     const rankingFormulaEl = document.getElementById("rankingFormula");
     const rankingHintEl = document.getElementById("rankingHint");
+    const rankingReturnChartEl = document.getElementById("rankingReturnChart");
     const rankingBuyRulesEl = document.getElementById("rankingBuyRules");
     const rankingTableBodyEl = document.getElementById("rankingTableBody");
 
@@ -2823,6 +2882,66 @@
       `).join("");
     }
 
+    function renderRecentReturnChart(trades) {
+      const settled = (trades || [])
+        .map(trade => ({
+          date: String(trade?.sellDate || ""),
+          value: parsePercentValue(trade?.accountReturn || trade?.profit)
+        }))
+        .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date) && Number.isFinite(item.value))
+        .sort((left, right) => left.date.localeCompare(right.date));
+
+      if (!settled.length) {
+        rankingReturnChartEl.innerHTML = renderEmptyState("暂无已结算收益数据");
+        return;
+      }
+
+      const grouped = new Map();
+      settled.forEach(item => grouped.set(item.date, (grouped.get(item.date) || 0) + item.value));
+      const dates = Array.from(grouped.keys()).sort();
+      let cumulative = 0;
+      const points = [{ date: dates[0], value: 0 }];
+      dates.forEach(date => {
+        cumulative = ((1 + cumulative / 100) * (1 + grouped.get(date) / 100) - 1) * 100;
+        points.push({ date, value: cumulative });
+      });
+
+      const width = 720;
+      const height = 250;
+      const left = 54;
+      const right = 18;
+      const top = 20;
+      const bottom = 42;
+      const plotWidth = width - left - right;
+      const plotHeight = height - top - bottom;
+      const values = points.map(point => point.value);
+      const rawMin = Math.min(0, ...values);
+      const rawMax = Math.max(0, ...values);
+      const padding = Math.max((rawMax - rawMin) * 0.15, 1);
+      const min = rawMin - padding;
+      const max = rawMax + padding;
+      const scaleX = index => left + (points.length === 1 ? plotWidth / 2 : index / (points.length - 1) * plotWidth);
+      const scaleY = value => top + (max - value) / (max - min) * plotHeight;
+      const zeroY = scaleY(0);
+      const polyline = points.map((point, index) => `${scaleX(index).toFixed(2)},${scaleY(point.value).toFixed(2)}`).join(" ");
+      const labelIndexes = Array.from(new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]));
+      const yLabels = [max, 0, min];
+
+      rankingReturnChartEl.innerHTML = `
+        <div class="return-chart-head">
+          <span>最近收益</span>
+          <strong>${escapeHtml(`${points[0].date} 至 ${points[points.length - 1].date}`)}</strong>
+        </div>
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="最近收益累计折线图">
+          ${yLabels.map(value => `<line class="${value === 0 ? "chart-zero" : "chart-grid"}" x1="${left}" x2="${width - right}" y1="${scaleY(value).toFixed(2)}" y2="${scaleY(value).toFixed(2)}"></line>`).join("")}
+          ${yLabels.map(value => `<text x="${left - 8}" y="${(scaleY(value) + 4).toFixed(2)}" text-anchor="end">${escapeHtml(`${formatNumber(value, 2)}%`)}</text>`).join("")}
+          <polyline class="chart-line" points="${polyline}"></polyline>
+          ${points.map((point, index) => `<circle class="chart-dot" cx="${scaleX(index).toFixed(2)}" cy="${scaleY(point.value).toFixed(2)}" r="3"><title>${escapeHtml(`${point.date}: ${formatNumber(point.value, 4)}%`)}</title></circle>`).join("")}
+          ${labelIndexes.map(index => `<text x="${scaleX(index).toFixed(2)}" y="${height - 12}" text-anchor="middle">${escapeHtml(points[index].date)}</text>`).join("")}
+        </svg>
+      `;
+    }
+
     function renderOverview(parsed, payload) {
       const summary = parsed.summaryInfo.summary;
       heroSummaryEl.innerHTML = `最新交易日: ${escapeHtml(extractHeadlineValue(summary.latestTrade || "最新交易日: -"))}&nbsp;&nbsp;结果来源: ${escapeHtml(resultSource(payload))} | <span class="cache-highlight">最后缓存时间: ${escapeHtml(payload.cached_at || "-")}</span>`;
@@ -2895,6 +3014,7 @@
         : currentStrategy === "v4"
           ? "V4 的原始结果不单列完整条件编号，主页面按最新买入计划、排名和 time60 展示可还原的观察条件。"
           : "V8 的买入条件按 step1~step4 显示；过滤条件按最新文本可还原的规则展示。";
+      renderRecentReturnChart(parsed.recentTrades);
       renderRankingTable(parsed.rankRows);
 
       tradeDialogNoteEl.textContent = `${currentStrategy.toUpperCase()} 最近交易明细。未结算记录的卖出条件、卖出日期、卖出价格、收益、账户收益都显示为 -。`;
@@ -2968,6 +3088,7 @@
       sellPlanListEl.innerHTML = renderEmptyState("暂无卖出计划");
       rankingFormulaEl.textContent = "Score公式: -";
       rankingBuyRulesEl.innerHTML = "";
+      rankingReturnChartEl.innerHTML = renderEmptyState("暂无已结算收益数据");
       rankingTableBodyEl.innerHTML = `<tr><td colspan="8">${renderEmptyState("暂无排行数据")}</td></tr>`;
       tradeTableBodyEl.innerHTML = `<tr><td colspan="9">${renderEmptyState("暂无最近交易数据")}</td></tr>`;
       profitCardsEl.innerHTML = renderEmptyState("暂无收益数据");
