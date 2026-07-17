@@ -1956,7 +1956,7 @@
 
     function defaultScoreFormula(strategy) {
       if (strategy === "v8") {
-        return "16 * chg10 + 8 * chg50 - 5 * last1chg";
+        return "16 * chg10 + 8 * chg50 - 5 * last1chg (last1chg=(n-1收盘价-n-1开盘价)/n-2收盘价)";
       }
       if (strategy === "v4") {
         return "26 * shorttimechg + 12 * longtimechg";
