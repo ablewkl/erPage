@@ -1961,7 +1961,7 @@
       if (strategy === "v4") {
         return "26 * shorttimechg + 12 * longtimechg";
       }
-      return "14 * shorttimechg + 3 * longtimechg - 3 * last1chg";
+      return "6 * longtimechg + 20 * shorttimechg - 3 * last1chg (last1chg=(n-1收盘价-n-1开盘价)/n-2收盘价)";
     }
 
     function extractSummary(lines, payload) {
@@ -2448,7 +2448,7 @@
 
           let last1 = NaN;
           if ([score, shortChg, longChg].every(Number.isFinite)) {
-            last1 = (14 * shortChg + 3 * longChg - score) / 3;
+            last1 = (6 * longChg + 20 * shortChg - score) / 3;
           }
 
           rows.push({
