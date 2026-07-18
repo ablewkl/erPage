@@ -2901,9 +2901,7 @@
       currentReturnChartPoints = dates.length ? [{ date: dates[0], value: 0 }] : [];
       dates.forEach(date => {
         const dailyReturn = grouped.get(date);
-        cumulative = currentStrategy === "v4"
-          ? cumulative + dailyReturn
-          : ((1 + cumulative / 100) * (1 + dailyReturn / 100) - 1) * 100;
+        cumulative += dailyReturn;
         currentReturnChartPoints.push({ date, value: cumulative });
       });
 
