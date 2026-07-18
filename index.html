@@ -1336,7 +1336,7 @@
     </div>
   </div>
 
-  <script src="./vendor/echarts.min.js"></script>
+  <script src="./echarts.min.js"></script>
   <script>
     const DEFAULT_BASE_URL = "https://1258557411-28azoctxlh.ap-guangzhou.tencentscf.com";
     const baseUrl = DEFAULT_BASE_URL.replace(/\/+$/, "");
@@ -1463,6 +1463,7 @@
     let allOperationSignalCloseMap = {};
     let allOperationSignalCloseRequestId = 0;
     let currentReturnChartPoints = [];
+    let echartsLoadPromise = null;
     let activeTooltipTrigger = null;
     let activeTooltipPinned = false;
     let activeTooltipEl = pageTooltipEl;
@@ -2909,7 +2910,15 @@
         return;
       }
 
-      const chart = echarts.getInstanceByDom(rankingReturnChartEl) || echarts.init(rankingReturnChartEl, null, { renderer: "canvas" });
+      if (!window.echarts) {
+        rankingReturnChartEl.innerHTML = renderEmptyState("正在加载图表组件...");
+        void ensureEchartsLoaded().then(() => renderRecentReturnChart(trades)).catch(() => {
+          rankingReturnChartEl.innerHTML = renderEmptyState("图表组件加载失败，请确认 echarts.min.js 已与 index.html 一同部署。");
+        });
+        return;
+      }
+
+      const chart = window.echarts.getInstanceByDom(rankingReturnChartEl) || window.echarts.init(rankingReturnChartEl, null, { renderer: "canvas" });
       chart.setOption({
         animationDuration: 500,
         color: ["#b65e38"],
@@ -2923,8 +2932,21 @@
       chart.resize();
     }
 
+    function ensureEchartsLoaded() {
+      if (window.echarts) return Promise.resolve(window.echarts);
+      if (echartsLoadPromise) return echartsLoadPromise;
+      echartsLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = new URL("./echarts.min.js", window.location.href).href;
+        script.onload = () => window.echarts ? resolve(window.echarts) : reject(new Error("ECharts did not initialize"));
+        script.onerror = () => reject(new Error("ECharts failed to load"));
+        document.head.appendChild(script);
+      });
+      return echartsLoadPromise;
+    }
+
     function clearRecentReturnChart() {
-      const chart = echarts.getInstanceByDom(rankingReturnChartEl);
+      const chart = window.echarts?.getInstanceByDom(rankingReturnChartEl);
       if (chart) chart.dispose();
       rankingReturnChartEl.innerHTML = renderEmptyState("暂无已结算收益数据");
     }
