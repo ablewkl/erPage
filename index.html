@@ -1016,11 +1016,11 @@
         <p id="heroSummary">最新交易日: -&nbsp;&nbsp;结果来源: - | <span class="cache-highlight">最后缓存时间: -</span></p>
       </div>
       <div class="hero-copy">
-        <div class="toolbar">
-          <button id="btnV7" class="active" type="button">V7</button>
-          <button id="btnV8" type="button">V8</button>
-          <button id="btnV4" type="button">V4</button>
-          <button id="openAllOperationsBtn" type="button">全部操作</button>
+       <div class="toolbar">
+         <button id="btnV4" class="active" type="button">V4</button>
+         <button id="btnV7" type="button">V7</button>
+         <button id="btnV8" type="button">V8</button>
+         <button id="openAllOperationsBtn" type="button">全部操作</button>
           <button id="btnRefresh" class="warn" type="button">获取最新数据</button>
         </div>
         <div class="status" id="status">请输入口令后读取前端缓存</div>
@@ -1452,7 +1452,7 @@
       "卖出计划"
     ];
 
-    let currentStrategy = "v7";
+    let currentStrategy = "v4";
     let currentPassword = "";
     let currentPayload = null;
     let currentParsed = null;
@@ -2889,7 +2889,7 @@
       const settled = (trades || [])
         .map(trade => ({
           date: String(trade?.sellDate || ""),
-          value: parsePercentValue(trade?.accountReturn || trade?.profit)
+          value: parsePercentValue(trade?.profit || trade?.accountReturn)
         }))
         .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date) && Number.isFinite(item.value))
         .sort((left, right) => left.date.localeCompare(right.date));
@@ -3225,8 +3225,8 @@
         if (!currentPassword.trim()) {
           throw new Error("请先输入口令");
         }
-        setStatus("获取中: V7 / V8 / V4");
-        setLoading(true, "获取最新数据", "正在获取 V7 / V8 / V4 最新结果");
+        setStatus("获取中: V4 / V7 / V8");
+        setLoading(true, "获取最新数据", "正在获取 V4 / V7 / V8 最新结果");
         await fetchStrategyBundle(true);
         await renderCurrentStrategyFromBundle();
       } catch (error) {
