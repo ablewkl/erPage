@@ -2530,7 +2530,8 @@
         const open = Number(matched[9]);
         const close = Number(matched[10]);
         const percent = Number(matched[11]);
-        const diff = close - open;
+        // 与后端一致:先四舍五入到 3 位再比较 < -0.001,避免浮点减法误判。
+        const diff = Math.round((close - open) * 1000) / 1000;
 
         const conditions = [];
         const time60Ok = Number.isFinite(time60) && time60 >= -0.06;
