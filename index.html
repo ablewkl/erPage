@@ -2100,6 +2100,14 @@
       });
     }
 
+    function isBuyPlanEtfLine(line) {
+      return /^(.+?)\((S[HZ]\d+)\)/.test(String(line || ""));
+    }
+
+    function filterBuyPlanLines(lines, options = {}) {
+      return filterMeaningfulLines(lines, options).filter(isBuyPlanEtfLine);
+    }
+
     function formatCountLabel(count) {
       return count > 0 ? `${count}份` : "无";
     }
@@ -3004,12 +3012,12 @@
     function renderDialogs(parsed) {
       const summary = parsed.summaryInfo.summary;
       const statsDisplay = resolveStatsDisplay(summary.stats);
-      const buyCount = countMeaningfulLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" });
+      const buyCount = filterBuyPlanLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" }).length;
       const holdCount = countMeaningfulLines(parsed.holds);
       const sellCount = countMeaningfulLines(parsed.sellPlans);
 
       operationDialogNoteEl.textContent = `买入计划:${formatCountLabel(buyCount)}，当前持仓:${formatCountLabel(holdCount)}，卖出计划:${formatCountLabel(sellCount)}`;
-      buyPlanListEl.innerHTML = renderRecordCards(filterMeaningfulLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" }), "暂无买入计划", { showSplitRatio: true });
+      buyPlanListEl.innerHTML = renderRecordCards(filterBuyPlanLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" }), "暂无买入计划", { showSplitRatio: true });
       holdListEl.innerHTML = renderRecordCards(parsed.holds, "暂无当前持仓");
       sellPlanListEl.innerHTML = renderRecordCards(buildV7SellPlanDisplayLines(parsed), "暂无卖出计划", { showSplitRatio: true });
       renderSizingFromParsed(parsed);
@@ -3052,7 +3060,7 @@
       }
 
       const statsDisplay = resolveStatsDisplay(parsed.summaryInfo.summary.stats);
-      const buyPlanCount = countMeaningfulLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" });
+      const buyPlanCount = filterBuyPlanLines(parsed.buyPlans, { skipPrefix: "卖出前持仓数:" }).length;
       const holdCount = countMeaningfulLines(parsed.holds);
       const sellCount = countMeaningfulLines(parsed.sellPlans);
       const settledCount = parsed.recentTrades.filter(item => item.sellDate && item.sellDate !== "-").length;
